@@ -1,5 +1,5 @@
 // ============================================================================
-// MP4 Vehicle Detector Clean
+// MP4 Vehicle Detector
 // ============================================================================
 // Detects the current MP4 vehicle from multiple sources (AsyncModelName,
 // Manialink labels, RootMap.CollectionName, ForceModelId) and provides

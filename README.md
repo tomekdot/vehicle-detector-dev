@@ -17,7 +17,7 @@ This repository is prepared for public release on GitHub. The plugin code, the P
 
 - `Plugins/vehicle-detector` - Openplanet plugin source
 - `Plugins/vehicle-detector/tools` - Python training and inference tools
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean` - training data and generated artifacts
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector` - training data and generated artifacts
 
 ## 🧪 Training output
 
@@ -58,5 +58,5 @@ The local dataset is stored in the Openplanet storage folder under:
 ## 👤 Contact
 
 - Author: `tomekdot`
-- Team: 'vitalism-creative'
-- Discord: `@tomekdot'
+- Team: `vitalism-creative`
+- Discord: `@tomekdot`

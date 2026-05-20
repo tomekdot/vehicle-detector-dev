@@ -1,5 +1,5 @@
 // ============================================================================
-// MP4 Vehicle Detector Clean
+// MP4 Vehicle Detector
 // ============================================================================
 // Split module for Plugins/vehicle-detector. Openplanet compiles all .as files
 // in this plugin directory together.

@@ -26,11 +26,15 @@ This file lists the repository contents that should be published together for th
 - `Plugins/vehicle-detector/tools/server.py`
 - `Plugins/vehicle-detector/tools/requirements.txt`
 - `Plugins/vehicle-detector/tools/.gitignore`
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/dataset_manifest.json`
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/samples_train.jsonl`
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/samples_validation.jsonl`
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/dataset_manifest.json`
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/samples_train.jsonl`
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/samples_validation.jsonl`
 
 ## Generated files that should stay untracked
 
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/__pycache__/`
-- `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/vehicle_detector_model.pkl`
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/__pycache__/`
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/vehicle_detector_model.pkl`
+
+## Dataset folder docs
+
+- `PluginStorage/vehicle-detector/mp4-vehicle-detector/README.md`
