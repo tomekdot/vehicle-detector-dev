@@ -31,7 +31,7 @@ Python training and inference utilities for the Openplanet vehicle detector plug
 
 ## 🗂️ Data location
 
-- Training and validation JSONL samples live in `PluginStorage/vehicle-detector/mp4-vehicle-detector-clean/`.
+- Training and validation JSONL samples live in `PluginStorage/vehicle-detector/mp4-vehicle-detector/`.
 - The generated model file `vehicle_detector_model.pkl` is written next to `train.py` and `server.py`.
 
 ## 👤 Contact

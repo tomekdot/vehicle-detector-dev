@@ -1,5 +1,5 @@
 // ============================================================================
-// MP4 Vehicle Detector Clean
+// MP4 Vehicle Detector
 // ============================================================================
 // Split module for Plugins/vehicle-detector. Openplanet compiles all .as files
 // in this plugin directory together.
@@ -65,4 +65,4 @@ const float TRAINING_RESUME_SPEED_KMH = 6.0f;
 const float TRAINING_RESUME_GAS = 0.35f;
 const float TRAINING_STEER_THRESHOLD = 0.35f;
 const float TRAINING_GAS_THRESHOLD = 0.35f;
-const string DATASET_STORAGE_FOLDER = "mp4-vehicle-detector-clean";
+const string DATASET_STORAGE_FOLDER = "mp4-vehicle-detector";

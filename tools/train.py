@@ -64,7 +64,7 @@ def load_jsonl(path: Path) -> pd.DataFrame:
 
 def main() -> int:
     base_dir = Path(__file__).resolve().parent
-    data_dir = base_dir.parent.parent / "PluginStorage" / "vehicle-detector" / "mp4-vehicle-detector-clean"
+    data_dir = base_dir.parent.parent / "PluginStorage" / "vehicle-detector" / "mp4-vehicle-detector"
     train_path = data_dir / "samples_train.jsonl"
     validation_path = data_dir / "samples_validation.jsonl"
     model_path = base_dir / "vehicle_detector_model.pkl"

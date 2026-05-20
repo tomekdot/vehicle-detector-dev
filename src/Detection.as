@@ -1,5 +1,5 @@
 // ============================================================================
-// MP4 Vehicle Detector Clean
+// MP4 Vehicle Detector
 // ============================================================================
 // Split module for Plugins/vehicle-detector. Openplanet compiles all .as files
 // in this plugin directory together.
@@ -61,7 +61,7 @@ void SetCurrentVehicle(const string &in vehicle, const string &in displayName, c
 
     // Log vehicle transitions (e.g. "StadiumCar -> CanyonCar (AsyncModelName)")
     if (S_LogVehicleChanges && g_CurrentVehicle != g_LastLoggedVehicle) {
-        print("[MP4 Vehicle Detector Clean] " + g_LastLoggedVehicle + " -> " + g_CurrentVehicle + " (" + g_CurrentSource + ")");
+        print("[MP4 Vehicle Detector] " + g_LastLoggedVehicle + " -> " + g_CurrentVehicle + " (" + g_CurrentSource + ")");
         g_LastLoggedVehicle = g_CurrentVehicle;
     }
 
