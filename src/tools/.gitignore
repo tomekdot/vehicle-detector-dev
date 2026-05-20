@@ -1,0 +1,11 @@
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated model artifacts
+vehicle_detector_model.pkl
+
+# Optional local tooling caches
+.pytest_cache/
+.mypy_cache/
