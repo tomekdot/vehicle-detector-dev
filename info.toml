@@ -1,0 +1,8 @@
+[meta]
+name = "Vehicle Detector"
+author = "tomekdot"
+version = "0.1.0"
+category = "Galaxy"
+
+[script]
+dependencies = [ "VehicleState" ]
