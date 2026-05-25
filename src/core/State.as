@@ -61,4 +61,3 @@ uint g_TotalDatasetSamples = 0;
 uint g_TrainDatasetSamples = 0;
 uint g_ValidationDatasetSamples = 0;
 string g_LastDatasetWriteError = "";
-

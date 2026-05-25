@@ -17,7 +17,7 @@ string CleanupVehicleText(const string &in rawText) {
     string text = Text::StripFormatCodes(rawText);
     if (text.Length == 0) return "";
 
-    // Strip path — keep only the segment after the last "/" or "\"
+    // Strip path — keep only the segment after the last "/" or "\\"
     int slashIx = text.LastIndexOf("/");
     int backslashIx = text.LastIndexOf("\\");
     int splitIx = slashIx > backslashIx ? slashIx : backslashIx;
@@ -123,4 +123,3 @@ string GetVehicleTexturePath(const string &in vehicle) {
     if (vehicle == "TrafficCar") return "Media/MEDIABROWSER_HiddenResources/Common/Images/Editors/Vehicle/TrafficCar.webp";
     return "";
 }
-

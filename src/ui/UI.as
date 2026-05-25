@@ -132,6 +132,8 @@ void Render() {
     UI::Texture@ tex = GetVehicleTexture(g_CurrentVehicle);
     if (tex !is null) {
         UI::Image(tex, vec2(220, 120));
+        string texPath = GetVehicleTexturePath(g_CurrentVehicle);
+        if (texPath.Length > 0) UI::TextDisabled("Texture: " + texPath);
     } else {
         UI::TextDisabled("No thumbnail available for this entry.");
     }

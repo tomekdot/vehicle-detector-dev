@@ -136,6 +136,41 @@ void EnsureContinuousTrainingCapture(CSceneVehicleVisState@ state, float speedKm
 // ============================================================================
 
 /**
+ * Returns true when a label is trusted enough to be exported.
+ * Trusted = non-empty, not Unknown, and not a raw-only source.
+ */
+bool IsTrustedTrainingLabel(const string &in labelVehicle, const string &in labelSource) {
+    if (labelVehicle.Length == 0) return false;
+    if (labelVehicle == "Unknown") return false;
+    if (labelSource.EndsWith("(raw)")) return false;
+    return true;
+}
+
+/**
+ * Ensures a connected localhost socket for training export. Reuses the
+ * global `g_TrainingSocket` and throttles reconnect attempts.
+ */
+Net::Socket@ EnsureTrainingSocket() {
+    if (!S_EnableTrainingExport) return null;
+
+    // Reuse ready socket
+    if (g_TrainingSocket !is null && g_TrainingSocket.IsReady()) return g_TrainingSocket;
+
+    // Throttle reconnect attempts
+    if (Time::Now - g_LastTrainingConnectAttemptMs < TRAINING_SOCKET_RETRY_MS) return g_TrainingSocket;
+    g_LastTrainingConnectAttemptMs = Time::Now;
+
+    try {
+        @g_TrainingSocket = Net::Socket();
+        g_TrainingSocket.Connect("127.0.0.1", int(S_TrainingExportPort));
+    } catch {
+        @g_TrainingSocket = null;
+    }
+
+    return g_TrainingSocket;
+}
+
+/**
  * Streams a single JSONL training sample to localhost. Only trusted
  * labels are exported so the dataset is not polluted by weak guesses.
  */
@@ -302,6 +337,7 @@ string BuildTrainingSampleJson(CSceneVehicleVisState@ state, float speedKmh, uin
     payload += ",\"source\":\"" + JsonEscape(labelSource) + "\"";
     payload += ",\"motion\":\"" + JsonEscape(motionLabel) + "\"";
     payload += ",\"raw_value\":\"" + JsonEscape(g_CurrentRawValue) + "\"";
+    payload += ",\"texture_path\":\"" + JsonEscape(GetVehicleTexturePath(labelVehicle)) + "\"";
     payload += ",\"speed_kmh\":" + Text::Format("%.3f", speedKmh);
     payload += ",\"gear\":" + Text::Format("%d", state.CurGear);
     payload += ",\"rpm\":" + Text::Format("%.3f", state.RPM);
@@ -396,37 +432,3 @@ void WriteDatasetManifest() {
 
     Json::ToFile(dir + "/dataset_manifest.json", root, true);
 }
-
-
-// ============================================================================
-// Section: Training Label Trust
-// ============================================================================
-
-/** Returns true only when the current label is good enough for training. */
-bool IsTrustedTrainingLabel(const string &in vehicle, const string &in source) {
-    if (vehicle == "Unknown" || vehicle.Length == 0) return false;
-    return source == "AsyncModelName" || source == "Manialink" || source == "Manual selection";
-}
-
-
-// ============================================================================
-// Section: Training Socket Stream
-// ============================================================================
-
-/** Connects to localhost once, then reuses the socket when ready. */
-Net::Socket@ EnsureTrainingSocket() {
-    if (g_TrainingSocket !is null && g_TrainingSocket.IsHungUp()) {
-        g_TrainingSocket.Close();
-        @g_TrainingSocket = null;
-    }
-
-    if (g_TrainingSocket is null) {
-        if (Time::Now - g_LastTrainingConnectAttemptMs < TRAINING_SOCKET_RETRY_MS) return null;
-        @g_TrainingSocket = Net::Socket();
-        g_TrainingSocket.Connect("127.0.0.1", uint16(S_TrainingExportPort));
-        g_LastTrainingConnectAttemptMs = Time::Now;
-    }
-
-    return g_TrainingSocket;
-}
-
