@@ -135,7 +135,6 @@ void ResetAccelerationRun() {
 }
 
 
-
 /**
  * If the primary detection failed or is unreliable (Unknown, raw-only,
  * or RootMap fallback), overwrites the result with the telemetry guess.
@@ -170,5 +169,3 @@ void ApplyTelemetryFallback(const string &in vehicle, const string &in displayNa
     outRawValue = g_TelemetryGuessReason;
     didOverride = true;
 }
-
-

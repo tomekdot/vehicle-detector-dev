@@ -209,9 +209,9 @@ bool TryResolveVehicle(const string &in candidate, const string &in sourceName, 
 }
 
 /**
- * Walks all visible Manialink UI layers and scans their frames for
- * vehicle-related labels. Returns the first matching label value,
- * or "" if nothing was found.
+ * Walks all visible Manialink UI layers and scans their frames for labels
+ * that contain a known vehicle name or have a "vehicle"-related
+ * ControlId. Returns the label's raw Value on first match.
  */
 string ScanUiForVehicle(CTrackMania@ app) {
     if (!S_ScanManialinkLabels) return "";
@@ -268,4 +268,3 @@ string ScanFrameForVehicle(CGameManialinkFrame@ frame) {
 }
 
 #endif
-
