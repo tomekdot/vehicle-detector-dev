@@ -299,6 +299,7 @@ void Render() {
     UI::TextDisabled("Latest external detection: Plugins/vehicle-detector-dev/tools/results/latest_detection.json");
     UI::TextDisabled("Training mode: " + (S_ContinuousTrainingCapture ? "Continuous segments" : "Impact-triggered captures"));
     UI::TextDisabled("Samples streamed to 127.0.0.1:" + S_TrainingExportPort);
+    UI::TextDisabled("Hotkeys: Win+M, Menu or Ctrl+M pause/resume, M stop");
     UI::Text("Current training run: #" + Text::Format("%d", g_TrainingRunId));
     UI::Text("Network export status: " + (S_EnableTrainingExport ? "Enabled" : "Disabled"));
     if (!g_TrainingCaptureArmed) {
