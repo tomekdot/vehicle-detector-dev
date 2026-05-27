@@ -174,7 +174,7 @@ void Render() {
 
     UI::Separator();
     UI::Text("Training / Telemetry:");
-    UI::TextDisabled("Collecting trusted labels only: AsyncModelName, Manialink, Manual selection");
+    UI::TextDisabled("Collecting trusted labels only: Manual selection");
     UI::TextDisabled("Training mode: " + (S_ContinuousTrainingCapture ? "Continuous segments" : "Impact-triggered captures"));
     UI::TextDisabled("Samples streamed to 127.0.0.1:" + S_TrainingExportPort);
     UI::Text("Current training run: #" + Text::Format("%d", g_TrainingRunId));

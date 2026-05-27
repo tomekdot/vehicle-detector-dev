@@ -137,12 +137,12 @@ void EnsureContinuousTrainingCapture(CSceneVehicleVisState@ state, float speedKm
 
 /**
  * Returns true when a label is trusted enough to be exported.
- * Trusted = non-empty, not Unknown, and not a raw-only source.
+ * Trusted = non-empty, not Unknown, and created from Manual selection.
  */
 bool IsTrustedTrainingLabel(const string &in labelVehicle, const string &in labelSource) {
     if (labelVehicle.Length == 0) return false;
     if (labelVehicle == "Unknown") return false;
-    if (labelSource.EndsWith("(raw)")) return false;
+    if (labelSource != "Manual selection") return false;
     return true;
 }
 
