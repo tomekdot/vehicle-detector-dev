@@ -22,10 +22,53 @@ void StartTrainingCapture(const string &in reason) {
     AddTelemetryLine("Training capture started: " + reason);
 }
 
-/** Stops training when the player presses the in-game M key. */
+/** Handles the training hotkeys. Win+M or Ctrl+M pauses/resumes; M stops. */
 void HandleTrainingHotkeys() {
+    bool haveCtrl = UI::IsKeyDown(UI::Key::LeftCtrl) || UI::IsKeyDown(UI::Key::RightCtrl);
+    bool haveWin = UI::IsKeyDown(UI::Key::LeftSuper) || UI::IsKeyDown(UI::Key::RightSuper);
+    bool haveMenuDown = UI::IsKeyDown(UI::Key::Menu);
+
+    // Prevent accidental Windows key presses from triggering any other action
+    if (!haveCtrl && !haveWin && !haveMenuDown) {
+        if (UI::IsKeyPressed(UI::Key::LeftSuper) || UI::IsKeyPressed(UI::Key::RightSuper)) {
+            return;
+        }
+    }
+
+    // Combo: Win+M, Ctrl+M or Menu+M toggles pause/resume/start
+    if ((haveCtrl || haveWin || haveMenuDown) && UI::IsKeyPressed(UI::Key::M)) {
+        if (!g_TrainingCaptureArmed) {
+            StartTrainingSession();
+        } else if (g_TrainingCapturePaused) {
+            ResumeTrainingSession();
+        } else {
+            PauseTrainingSession();
+        }
+        return;
+    }
+
+    // Single Menu key toggles pause/resume/start without any combination
+    if (UI::IsKeyPressed(UI::Key::Menu)) {
+        if (!g_TrainingCaptureArmed) {
+            StartTrainingSession();
+        } else if (g_TrainingCapturePaused) {
+            ResumeTrainingSession();
+        } else {
+            PauseTrainingSession();
+        }
+        return;
+    }
+
+    // Standalone M key (no modifier) stops training
     if (UI::IsKeyPressed(UI::Key::M)) {
         StopTrainingSession();
+        return;
+    }
+
+    // Standalone Super key press without any modifier — swallow it
+    if (UI::IsKeyPressed(UI::Key::LeftSuper) || UI::IsKeyPressed(UI::Key::RightSuper)) {
+        StopTrainingSession();
+        return;
     }
 }
 
