@@ -4,7 +4,7 @@ Python training and inference utilities for the Openplanet vehicle detector plug
 
 ## ✨ Contents
 
-- `train.py` - trains the RandomForest model from exported JSONL samples
+- `train.py` - trains the windowed vehicle classifier from exported JSONL samples
 - `server.py` - serves live TCP inference on `127.0.0.1:9000`
 - `requirements.txt` - Python dependencies for training and serving
 - `LICENSE` - MIT license for the tooling bundle
@@ -22,6 +22,8 @@ Python training and inference utilities for the Openplanet vehicle detector plug
    ```bash
    python train.py
    ```
+
+   The trainer builds sliding windows from `run_id` and `elapsed_sec`, filters to `Manual selection` sources, and falls back to RandomForest when `xgboost` is unavailable.
 
 3. Start the inference server.
 
