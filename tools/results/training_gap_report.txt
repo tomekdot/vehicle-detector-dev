@@ -1,0 +1,51 @@
+Vehicle Detector Training Gap Report
+
+Date: 2026-05-27
+
+Source
+This report is generated automatically in Python from the current training and validation JSONL datasets, plus the latest offline validation report.
+
+Purpose
+Identify which vehicle classes are under-trained, how much data is currently available, and how much more data is needed to make validation more reliable and reduce class confusion.
+
+Offline Validation Snapshot
+- BayCar       0.71      0.93      0.81       306
+- CanyonCar       0.00      0.00      0.00         3
+- CoastCar       0.00      0.00      0.00         0
+- DesertCar       0.00      0.00      0.00         7
+- IslandCar       0.71      0.54      0.61        41
+- LagoonCar       0.67      0.45      0.54        78
+- RallyCar       0.00      0.00      0.00         9
+- SnowCar       1.00      0.04      0.08        25
+- ValleyCar       0.07      0.03      0.04        40
+
+Current Dataset Coverage
+Class        Train   Validation   Gap to 300 val   Gap to 1000 train
+BayCar        11651         3016                0                  0
+LagoonCar      2947          728                0                  0
+IslandCar      1797          344                0                  0
+ValleyCar      1270          407                0                  0
+SnowCar         846          270               30                154
+RallyCar        443          110              190                557
+DesertCar       441          110              190                559
+CoastCar        346           79              221                654
+CanyonCar       223           45              255                777
+StadiumCar       40            0              300                960
+TrafficCar        0            0              300               1000
+
+Most Important Gaps
+1. TrafficCar - train=0, validation=0, train gap=1000, validation gap=300
+2. StadiumCar - train=40, validation=0, train gap=960, validation gap=300
+3. CanyonCar - train=223, validation=45, train gap=777, validation gap=255
+4. CoastCar - train=346, validation=79, train gap=654, validation gap=221
+5. DesertCar - train=441, validation=110, train gap=559, validation gap=190
+6. RallyCar - train=443, validation=110, train gap=557, validation gap=190
+
+Practical Conclusion
+The first retraining priority should be the classes with the largest validation and training gaps. BayCar does not need priority collection because it already dominates the dataset.
+
+Collection Recommendations
+- Record samples in Manual selection mode.
+- Capture runs at different speeds, not only from standstill.
+- For each missing class, record several separate runs so different conditions are included in both training and validation.
+- Avoid letting BayCar dominate new samples.
