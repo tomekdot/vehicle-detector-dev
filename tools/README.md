@@ -41,3 +41,23 @@ Python training and inference utilities for the Openplanet vehicle detector plug
 - Author: `tomekdot`
 - GitHub: `tomekdot`
 - Issues and pull requests are welcome
+
+## 📦 Packaging (optional)
+
+You can create a single-file Windows executable using PyInstaller so users don't need Python installed.
+
+1. Install PyInstaller:
+
+```powershell
+python -m pip install pyinstaller
+```
+
+2. From this folder (`Plugins/vehicle-detector-dev/tools`) run:
+
+```powershell
+.build_exe.bat
+```
+
+This will produce `dist/vehicle-detector-server.exe`.
+
+Use `start_server.bat` to launch the server or run the exe directly.

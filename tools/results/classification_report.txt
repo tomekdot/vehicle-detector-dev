@@ -1,0 +1,15 @@
+              precision    recall  f1-score   support
+
+      BayCar       0.71      0.93      0.81       306
+   CanyonCar       0.00      0.00      0.00         3
+    CoastCar       0.00      0.00      0.00         0
+   DesertCar       0.00      0.00      0.00         7
+   IslandCar       0.71      0.54      0.61        41
+   LagoonCar       0.67      0.45      0.54        78
+    RallyCar       0.00      0.00      0.00         9
+     SnowCar       1.00      0.04      0.08        25
+   ValleyCar       0.07      0.03      0.04        40
+
+    accuracy                           0.68       509
+   macro avg       0.35      0.22      0.23       509
+weighted avg       0.64      0.68      0.62       509

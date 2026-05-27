@@ -14,6 +14,9 @@ bool S_ShowWindow = true;
 [Setting category="General" name="Show HUD Overlay"]
 bool S_ShowHudOverlay = true;
 
+[Setting category="HUD" name="Show Detection Window"]
+bool S_ShowDetectionWindow = true;
+
 [Setting category="Telemetry" name="Continuous Training Capture"]
 bool S_ContinuousTrainingCapture = true;
 
