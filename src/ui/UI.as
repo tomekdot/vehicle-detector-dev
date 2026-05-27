@@ -8,6 +8,54 @@
 // Section: UI — Menu & Render
 // ============================================================================
 
+// External detection state (updated from server's latest_detection.json)
+string g_ExternalDetectedLabel = "";
+float g_ExternalDetectedConfidence = 0.0f;
+uint64 g_LastDetectionCheckMs = 0;
+
+void UpdateLatestExternalDetection() {
+    string path = IO::FromStorageFolder("mp4-vehicle-detector/latest_detection.json");
+    if (!IO::FileExists(path)) {
+        g_ExternalDetectedLabel = "";
+        g_ExternalDetectedConfidence = 0.0f;
+        return;
+    }
+    Json::Value val = Json::FromFile(path);
+    if (val is null) {
+        g_ExternalDetectedLabel = "";
+        g_ExternalDetectedConfidence = 0.0f;
+        return;
+    }
+    if (val.Get("label") !is null) g_ExternalDetectedLabel = string(val.Get("label"));
+    if (val.Get("confidence") !is null) g_ExternalDetectedConfidence = Text::ParseFloat(string(val.Get("confidence")));
+}
+
+/** Accept the external detection and append it as a Manual selection sample. */
+void AcceptExternalDetectionAsManual() {
+    if (g_ExternalDetectedLabel.Length == 0) {
+        AddTelemetryLine("No external detection available to accept.");
+        return;
+    }
+
+    auto state = VehicleState::ViewingPlayerState();
+    if (state is null) {
+        AddTelemetryLine("No vehicle state available to capture sample.");
+        return;
+    }
+
+    float speedKmh = state.FrontSpeed * 3.6f;
+    uint captureStartMs = uint(Time::Now);
+    string split = GetDatasetSplitForRun();
+    string labelVehicle = g_ExternalDetectedLabel;
+    string labelSource = "Manual selection";
+    string motionLabel = g_TrainingMotionLabel;
+
+    string payload = BuildTrainingSampleJson(state, speedKmh, captureStartMs, split, labelVehicle, labelSource, motionLabel);
+    AppendDatasetSample(split, payload, labelVehicle);
+    AddTelemetryLine("Accepted external detection as Manual selection: " + ToPrettyVehicleName(labelVehicle));
+}
+
+
 /** Adds a toggle item to the Openplanet overlay menu. */
 void RenderMenu() {
     if (UI::MenuItem(Icons::Car + " Vehicle Detector", "", S_ShowWindow)) {
@@ -16,6 +64,9 @@ void RenderMenu() {
     if (UI::MenuItem(Icons::Eye + " Show HUD Overlay", "", S_ShowHudOverlay)) {
         S_ShowHudOverlay = !S_ShowHudOverlay;
     }
+        if (UI::MenuItem(Icons::Eye + " Show Detection Window", "", S_ShowDetectionWindow)) {
+            S_ShowDetectionWindow = !S_ShowDetectionWindow;
+        }
 }
 
 /** Draws a compact always-visible HUD with vehicle and training status. */
@@ -32,6 +83,11 @@ void RenderHudOverlay() {
     UI::SetNextWindowSize(120, 0, UI::Cond::FirstUseEver);
 
     if (UI::Begin(Icons::Car + " Vehicle HUD", flags)) {
+        // Update external detection file once per second
+        if (Time::Now - g_LastDetectionCheckMs > 1000) {
+            g_LastDetectionCheckMs = Time::Now;
+            UpdateLatestExternalDetection();
+        }
         if (!g_TrainingCaptureArmed) {
             if (UI::Button("Start training")) {
                 StartTrainingSession();
@@ -73,6 +129,13 @@ void RenderHudOverlay() {
             UI::TextDisabled("Label: Auto (Detection)");
         }
 
+        // External model detection (from server)
+        if (g_ExternalDetectedLabel.Length > 0) {
+            UI::Text("External detection: " + ToPrettyVehicleName(g_ExternalDetectedLabel) + " (" + Text::Format("%.0f", g_ExternalDetectedConfidence*100.0f) + "%)");
+        } else {
+            UI::TextDisabled("External detection: unknown");
+        }
+
         if (g_TrainingLockedVehicle.Length > 0 && g_CurrentVehicle != g_TrainingLockedVehicle) {
             UI::TextDisabled("Vehicle changed in game; training label stays locked.");
         }
@@ -91,7 +154,63 @@ void RenderHudOverlay() {
             }
             UI::EndCombo();
         }
+            UI::SameLine();
+            if (UI::Button("Accept detection as Manual")) {
+                AcceptExternalDetectionAsManual();
+            }
     }
+    UI::End();
+#endif
+}
+
+/** Renders a larger detection window showing detected vehicle, thumbnail and actions. */
+void RenderDetectionWindow() {
+#if !MP4
+    return;
+#else
+    if (!S_ShowDetectionWindow) return;
+
+    const uint flags = UI::WindowFlags::NoSavedSettings;
+    UI::SetNextWindowSize(260, 160, UI::Cond::FirstUseEver);
+    if (!UI::Begin(Icons::Car + " Detected Vehicle", S_ShowDetectionWindow, flags)) {
+        UI::End();
+        return;
+    }
+
+    if (g_ExternalDetectedLabel.Length == 0) {
+        UI::TextDisabled("Detected: unknown");
+    } else {
+        UI::Text("Detected:");
+        UI::SameLine();
+        UI::Text(" " + ToPrettyVehicleName(g_ExternalDetectedLabel));
+        UI::TextDisabled("Confidence: " + Text::Format("%.1f%%", g_ExternalDetectedConfidence * 100.0f));
+
+        UI::Separator();
+        UI::Text("Thumbnail:");
+        UI::Texture@ detectedTex = GetVehicleTexture(g_ExternalDetectedLabel);
+        if (detectedTex !is null) {
+            UI::Image(detectedTex, vec2(120, 60));
+        } else {
+            UI::TextDisabled("No thumbnail available.");
+        }
+
+        if (S_EnableTrainingExport) {
+            UI::Text("Export: Enabled");
+            if (UI::Button("Disable export")) {
+                S_EnableTrainingExport = false;
+            }
+        } else {
+            UI::Text("Export: Disabled");
+            if (UI::Button("Enable export")) {
+                S_EnableTrainingExport = true;
+            }
+        }
+        if (UI::Button("Accept detection as Manual")) {
+            AcceptExternalDetectionAsManual();
+        }
+        UI::TextWrapped("Tip: enable export and use Manual selection while driving to collect more trusted samples for underrepresented vehicles.");
+    }
+
     UI::End();
 #endif
 }
@@ -109,6 +228,7 @@ void Render() {
 #else
     // --- MP4: full UI ---
     RenderHudOverlay();
+    RenderDetectionWindow();
     if (!S_ShowWindow) return;
 
     UI::SetNextWindowSize(500, 420, UI::Cond::FirstUseEver);
@@ -175,6 +295,8 @@ void Render() {
     UI::Separator();
     UI::Text("Training / Telemetry:");
     UI::TextDisabled("Collecting trusted labels only: Manual selection");
+    UI::TextDisabled("Model inference: warm-start=6, conf>=60%, smoothing=2/3 (server)");
+    UI::TextDisabled("Latest external detection: Plugins/vehicle-detector-dev/tools/results/latest_detection.json");
     UI::TextDisabled("Training mode: " + (S_ContinuousTrainingCapture ? "Continuous segments" : "Impact-triggered captures"));
     UI::TextDisabled("Samples streamed to 127.0.0.1:" + S_TrainingExportPort);
     UI::Text("Current training run: #" + Text::Format("%d", g_TrainingRunId));
@@ -237,29 +359,6 @@ void Render() {
         }
         UI::EndCombo();
     }
-    if (g_SelectedTrainingVehicle.Length > 0) {
-        UI::Text("Active selection: " + ToPrettyVehicleName(g_SelectedTrainingVehicle) + " (#" + tostring(g_SelectedTrainingVehicleIndex) + ")");
-    } else if (g_TrainingLockedVehicle.Length > 0) {
-        UI::Text("Active selection: " + ToPrettyVehicleName(g_TrainingLockedVehicle) + " (locked)");
-    } else {
-        UI::Text("Active selection: Auto (Detection)");
-    }
-    UI::Text("Telemetry capture status: " + (g_TrainingCaptureActive ? "Active" : "Inactive"));
-
-    // Supported vehicles list
-    UI::Separator();
-    UI::Text("Supported Vehicles (" + tostring(TRAINING_SUPPORTED_VEHICLE_COUNT) + "):");
-    UI::Text("- StadiumCar");
-    UI::Text("- CanyonCar");
-    UI::Text("- ValleyCar");
-    UI::Text("- LagoonCar");
-    UI::Text("- IslandCar");
-    UI::Text("- BayCar");
-    UI::Text("- CoastCar");
-    UI::Text("- DesertCar");
-    UI::Text("- SnowCar");
-    UI::Text("- RallyCar");
-    UI::Text("- TrafficCar");
 
     // Collapsible telemetry / debug panel
     if (S_ShowTelemetryPanel && UI::CollapsingHeader("Telemetry / Debug")) {

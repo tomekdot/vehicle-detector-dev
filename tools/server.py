@@ -4,6 +4,7 @@ import json
 import socket
 from collections import deque
 from pathlib import Path
+import time
 
 import joblib
 import numpy as np
@@ -161,6 +162,13 @@ def build_single_frame_vector(payload: dict, feature_names: list[str]) -> list[f
 def main() -> int:
     base_dir = Path(__file__).resolve().parent
     model, classes, feature_names, window_size = load_model(base_dir)
+    # Warm-start: allow early predictions on a smaller initial window
+    WARM_START = min(6, window_size) if window_size > 1 else 1
+    # Confidence threshold (0..1) — below this treat as unknown for early predictions
+    CONF_THRESHOLD = 0.60
+    # Smoothing: require `SMOOTH_REQUIRED` repeated predictions within `SMOOTH_WINDOW`
+    SMOOTH_WINDOW = 3
+    SMOOTH_REQUIRED = 2
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -174,6 +182,7 @@ def main() -> int:
 
     buffer = ""
     window_buffer: deque[dict] = deque(maxlen=window_size if window_size > 0 else 1)
+    recent_preds: deque[str] = deque(maxlen=SMOOTH_WINDOW)
     current_run_id = None
 
     try:
@@ -203,23 +212,76 @@ def main() -> int:
                         current_run_id = run_id
                         window_buffer.clear()
 
+                    speed_value = to_float(payload, "speed_kmh")
+
+                    # Build a feature vector: if we have the full window, use it.
+                    # Otherwise allow a warm-start prediction when we reached WARM_START frames.
                     if window_size <= 1:
                         feature_vector = build_single_frame_vector(payload, feature_names)
+                        can_predict = True
                     else:
                         window_buffer.append(payload)
-                        if len(window_buffer) < window_size:
-                            continue
-                        feature_vector = build_feature_vector(list(window_buffer), feature_names)
+                        if len(window_buffer) >= window_size:
+                            feature_vector = build_feature_vector(list(window_buffer), feature_names)
+                            can_predict = True
+                        elif len(window_buffer) >= WARM_START:
+                            # warm-start: aggregate the smaller buffer and attempt a provisional prediction
+                            feature_vector = build_feature_vector(list(window_buffer), feature_names)
+                            can_predict = True
+                        else:
+                            can_predict = False
+
+                    if not can_predict:
+                        continue
 
                     prediction_idx = int(model.predict([feature_vector])[0])
                     probabilities = model.predict_proba([feature_vector])[0]
-                    confidence = float(probabilities[prediction_idx]) * 100.0
+                    confidence = float(probabilities[prediction_idx])
                     predicted_vehicle = classes[prediction_idx]
-                    speed_value = to_float(payload, "speed_kmh")
-                    print(
-                        f"Detected: {predicted_vehicle:<12} | Confidence: {confidence:5.1f}% | Speed: {speed_value:5.1f} km/h",
-                        end="\r",
-                    )
+
+                    # Early prediction gating: if using warm-start (buffer shorter than full), require confidence threshold
+                    using_warm = len(window_buffer) < window_size
+                    display_label = predicted_vehicle
+                    if using_warm and confidence < CONF_THRESHOLD:
+                        display_label = "unknown"
+
+                    # Smoothing: accumulate recent non-unknown predictions and require agreement
+                    recent_preds.append(display_label)
+                    stable_label = display_label
+                    # Check if the last SMOOTH_REQUIRED entries are equal and not 'unknown'
+                    if len(recent_preds) >= SMOOTH_REQUIRED:
+                        tail = list(recent_preds)[-SMOOTH_REQUIRED:]
+                        if all(x == tail[0] and x != "unknown" for x in tail):
+                            stable_label = tail[0]
+                        else:
+                            stable_label = "..."
+
+                    out_msg = f"Detected: {stable_label:<12} | Confidence: {confidence*100:5.1f}% | Speed: {speed_value:5.1f} km/h"
+                    print(out_msg, end="\r")
+
+                    # Persist latest detection for UI/plugins to consume if desired
+                    try:
+                        results_dir = base_dir / "results"
+                        results_dir.mkdir(exist_ok=True)
+                        latest = {
+                            "timestamp": int(time.time()),
+                            "label": stable_label,
+                            "confidence": float(confidence),
+                            "using_warm": bool(using_warm),
+                            "speed_kmh": float(speed_value),
+                            "run_id": current_run_id,
+                        }
+                        (results_dir / "latest_detection.json").write_text(json.dumps(latest), encoding="utf-8")
+                        # Also write to shared PluginStorage so the in-game plugin can read it
+                        try:
+                            storage_path = base_dir.parent.parent.parent / "PluginStorage" / "vehicle-detector" / "mp4-vehicle-detector"
+                            storage_path.mkdir(parents=True, exist_ok=True)
+                            (storage_path / "latest_detection.json").write_text(json.dumps(latest), encoding="utf-8")
+                        except Exception:
+                            pass
+                    except Exception:
+                        # non-fatal
+                        pass
                 except Exception:
                     continue
     finally:
