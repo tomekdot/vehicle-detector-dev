@@ -67,7 +67,6 @@ void HandleTrainingHotkeys() {
 
     // Standalone Super key press without any modifier — swallow it
     if (UI::IsKeyPressed(UI::Key::LeftSuper) || UI::IsKeyPressed(UI::Key::RightSuper)) {
-        StopTrainingSession();
         return;
     }
 }
