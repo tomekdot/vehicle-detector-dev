@@ -496,7 +496,6 @@ void RenderSurfaces() {
 
     // per-wheel material names
     nvg::BeginPath();
-    nvg::FontFace("GeodeSans");
     nvg::FontSize(S_SurfaceFontSize);
     nvg::FillColor(vec4(0.9f, 0.92f, 0.98f, 1.0f));
     nvg::TextAlign(nvg::Align::Middle | nvg::Align::Center);
