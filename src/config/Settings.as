@@ -47,6 +47,31 @@ uint S_ValidationEveryNRuns = 5;
 [Setting category="Telemetry" name="Training Export Port"]
 uint S_TrainingExportPort = 9000;
 
+// ---------------------------------------------------------------------------
+// Surface overlay — per-wheel ground contact material display
+// ---------------------------------------------------------------------------
+
+[Setting category="Surfaces" name="Show Surface Overlay"]
+bool S_ShowSurfaces = true;
+
+[Setting category="Surfaces" name="Overlay X (0-1)" min=0 max=1]
+float S_SurfaceX = 0.82;
+
+[Setting category="Surfaces" name="Overlay Y (0-1)" min=0 max=1]
+float S_SurfaceY = 0.70;
+
+[Setting category="Surfaces" name="Overlay Width" min=60 max=400]
+int S_SurfaceWidth = 140;
+
+[Setting category="Surfaces" name="Overlay Height" min=40 max=300]
+int S_SurfaceHeight = 80;
+
+[Setting category="Surfaces" name="Font Size" min=8 max=32]
+float S_SurfaceFontSize = 12.0f;
+
+[Setting category="Surfaces" name="Show Raw Material IDs"]
+bool S_SurfaceRaw = false;
+
 
 // ============================================================================
 // Section: Training Export Constants

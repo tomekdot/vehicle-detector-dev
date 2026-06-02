@@ -275,6 +275,7 @@ void Render() {
         UI::Text("Average slip: " + Text::Format("%.3f", GetAverageWheelSlip(state)));
         UI::Text("Wet wheels: " + Text::Format("%d", GetWetWheelCount(state)));
         UI::Text("Active effects: " + Text::Format("%d", state.ActiveEffects));
+        UI::Text("Surface: " + GetSurfaceSummary());
     }
 
     // 0-100 km/h timing section
@@ -361,6 +362,9 @@ void Render() {
         UI::EndCombo();
     }
 
+    // Surface overlay
+    RenderSurfaces();
+
     // Collapsible telemetry / debug panel
     if (S_ShowTelemetryPanel && UI::CollapsingHeader("Telemetry / Debug")) {
         UI::TextDisabled("Last update: " + tostring(g_LastTelemetryUpdate));
@@ -374,6 +378,167 @@ void Render() {
     }
 
     UI::End();
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// Surface overlay — per-wheel ground contact material display
+// ---------------------------------------------------------------------------
+
+#if TMNEXT
+string SurfaceMaterialName(EPlugSurfaceMaterialId mat) {
+    if (S_SurfaceRaw) return tostring(mat);
+    switch (mat) {
+        case EPlugSurfaceMaterialId::Concrete:
+        case EPlugSurfaceMaterialId::Asphalt:           return "road";
+        case EPlugSurfaceMaterialId::Grass:             return "grass";
+        case EPlugSurfaceMaterialId::Ice:
+        case EPlugSurfaceMaterialId::RoadIce:           return "ice";
+        case EPlugSurfaceMaterialId::Metal:             return "metal";
+        case EPlugSurfaceMaterialId::Sand:              return "sand";
+        case EPlugSurfaceMaterialId::Dirt:              return "dirt";
+        case EPlugSurfaceMaterialId::Rubber:            return "border";
+        case EPlugSurfaceMaterialId::Rock:              return "rock";
+        case EPlugSurfaceMaterialId::Water:             return "water";
+        case EPlugSurfaceMaterialId::Wood:              return "wood";
+        case EPlugSurfaceMaterialId::Snow:              return "snow";
+        case EPlugSurfaceMaterialId::ResonantMetal:     return "trackwall";
+        case EPlugSurfaceMaterialId::MetalTrans:        return "signage";
+        case EPlugSurfaceMaterialId::TechMagnetic:
+        case EPlugSurfaceMaterialId::TechSuperMagnetic: return "magnet";
+        case EPlugSurfaceMaterialId::TechMagneticAccel: return "magnet";
+        case EPlugSurfaceMaterialId::RoadSynthetic:     return "sausage";
+        case EPlugSurfaceMaterialId::Green:             return "grass";
+        case EPlugSurfaceMaterialId::Plastic:           return "plastic";
+        case EPlugSurfaceMaterialId::XXX_Null:          return "air";
+        default:                                        return tostring(mat);
+    }
+}
+#elif MP4 || TURBO
+string SurfaceMaterialName(CAudioSourceSurface::ESurfId mat) {
+    if (S_SurfaceRaw) return tostring(mat);
+    switch (mat) {
+        case CAudioSourceSurface::ESurfId::Concrete:
+        case CAudioSourceSurface::ESurfId::Asphalt:                  return "road";
+        case CAudioSourceSurface::ESurfId::Grass:                    return "grass";
+        case CAudioSourceSurface::ESurfId::Metal:                    return "metal";
+        case CAudioSourceSurface::ESurfId::Dirt:
+        case CAudioSourceSurface::ESurfId::DirtRoad:                 return "dirt";
+        case CAudioSourceSurface::ESurfId::Turbo:                    return "turbo";
+        case CAudioSourceSurface::ESurfId::Rubber:
+        case CAudioSourceSurface::ESurfId::WetDirtRoad:              return "wet dirt";
+        case CAudioSourceSurface::ESurfId::Turbo2:                   return "red turbo";
+        case CAudioSourceSurface::ESurfId::Bumper:                   return "bumper";
+        case CAudioSourceSurface::ESurfId::FreeWheeling:             return "free wheel";
+        case CAudioSourceSurface::ESurfId::Rock:                     return "rock";
+        case CAudioSourceSurface::ESurfId::Sand:                     return "sand";
+        case CAudioSourceSurface::ESurfId::Wood:                     return "wood";
+        case CAudioSourceSurface::ESurfId::TechMagnetic:             return "magnet";
+        case CAudioSourceSurface::ESurfId::TurboTechMagnetic:        return "mag turbo";
+        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return "mag free";
+        case CAudioSourceSurface::ESurfId::TechSuperMagnetic:        return "super mag";
+#if MP4
+        case CAudioSourceSurface::ESurfId::RubberBand:               return "border";
+        case CAudioSourceSurface::ESurfId::NoGrip:                   return "no grip";
+        case CAudioSourceSurface::ESurfId::Bumper2:                  return "red bumper";
+        case CAudioSourceSurface::ESurfId::NoSteering:               return "no steer";
+        case CAudioSourceSurface::ESurfId::NoBrakes:                 return "no brake";
+#endif
+        default:                                                     return tostring(mat);
+    }
+}
+#endif
+
+void RenderSurfaces() {
+#if !MP4
+    return;
+#else
+    if (!S_ShowSurfaces) return;
+
+    auto state = VehicleState::ViewingPlayerState();
+    if (state is null) return;
+
+    int displayWidth = Display::GetWidth();
+    int displayHeight = Display::GetHeight();
+
+    int x = int(S_SurfaceX * displayWidth);
+    int y = int(S_SurfaceY * displayHeight);
+    int w = S_SurfaceWidth;
+    int h = S_SurfaceHeight;
+
+    float halfW = w * 0.5f;
+    float halfH = h * 0.5f;
+
+    // background
+    nvg::BeginPath();
+    nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
+    nvg::FillColor(vec4(0.08f, 0.09f, 0.12f, 0.82f));
+    nvg::Fill();
+
+    // inner cross
+    nvg::StrokeWidth(1.0f);
+    nvg::StrokeColor(vec4(0.3f, 0.35f, 0.45f, 0.5f));
+    nvg::BeginPath();
+    nvg::MoveTo(vec2(x + halfW, y));
+    nvg::LineTo(vec2(x + halfW, y + h));
+    nvg::Stroke();
+    nvg::BeginPath();
+    nvg::MoveTo(vec2(x, y + halfH));
+    nvg::LineTo(vec2(x + w, y + halfH));
+    nvg::Stroke();
+
+    // border
+    nvg::StrokeWidth(1.0f);
+    nvg::StrokeColor(vec4(0.5f, 0.6f, 0.8f, 0.4f));
+    nvg::BeginPath();
+    nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
+    nvg::Stroke();
+
+    // per-wheel material names
+    nvg::BeginPath();
+    nvg::FontFace("GeodeSans");
+    nvg::FontSize(S_SurfaceFontSize);
+    nvg::FillColor(vec4(0.9f, 0.92f, 0.98f, 1.0f));
+    nvg::TextAlign(nvg::Align::Middle | nvg::Align::Center);
+
+    float frontY = y + halfH * 0.5f;
+    nvg::TextBox(vec2(x + 1, frontY - halfH * 0.5f + 2), halfW - 2,
+        SurfaceMaterialName(state.FLGroundContactMaterial));
+    nvg::TextBox(vec2(x + halfW + 1, frontY - halfH * 0.5f + 2), halfW - 2,
+        SurfaceMaterialName(state.FRGroundContactMaterial));
+
+    float rearY = y + halfH + halfH * 0.5f;
+    nvg::TextBox(vec2(x + 1, rearY - halfH * 0.5f + 2), halfW - 2,
+        SurfaceMaterialName(state.RLGroundContactMaterial));
+    nvg::TextBox(vec2(x + halfW + 1, rearY - halfH * 0.5f + 2), halfW - 2,
+        SurfaceMaterialName(state.RRGroundContactMaterial));
+
+    // wheel position labels (tiny, above material names)
+    nvg::FontSize(Math::Max(8.0f, S_SurfaceFontSize * 0.55f));
+    nvg::FillColor(vec4(0.5f, 0.55f, 0.65f, 0.7f));
+    nvg::TextBox(vec2(x, y + 2), halfW, "FL");
+    nvg::TextBox(vec2(x + halfW, y + 2), halfW, "FR");
+    nvg::TextBox(vec2(x, y + halfH + 2), halfW, "RL");
+    nvg::TextBox(vec2(x + halfW, y + halfH + 2), halfW, "RR");
+#endif
+}
+
+/** Helper: return a short surface summary string for use in text HUDs. */
+string GetSurfaceSummary() {
+#if !MP4
+    return "N/A";
+#else
+    auto state = VehicleState::ViewingPlayerState();
+    if (state is null) return "N/A";
+
+    string fl = SurfaceMaterialName(state.FLGroundContactMaterial);
+    string fr = SurfaceMaterialName(state.FRGroundContactMaterial);
+    string rl = SurfaceMaterialName(state.RLGroundContactMaterial);
+    string rr = SurfaceMaterialName(state.RRGroundContactMaterial);
+
+    if (fl == fr && fr == rl && rl == rr) return fl;
+    if (fl == fr && rl == rr) return fl + " | " + rl;
+    return fl + "/" + fr + "/" + rl + "/" + rr;
 #endif
 }
 
