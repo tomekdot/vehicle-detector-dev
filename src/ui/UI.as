@@ -694,29 +694,31 @@ void RenderSurfaces() {
     float labelFontSize = Math::Max(9.0f, S_SurfaceFontSize * 0.5f);
     float nameFontSize = S_SurfaceFontSize;
 
-    // Wheel positions: FL, FR, RL, RR
+    // Per-wheel rendering — no inline array init (AngelScript limitation)
+    // Individual wheel variables avoid struct/array issues
+    vec2 c_fl(x + halfW * 0.45f, y + halfH * 0.45f);
+    vec2 c_fr(x + halfW + halfW * 0.45f, y + halfH * 0.45f);
+    vec2 c_rl(x + halfW * 0.45f, y + halfH + halfH * 0.45f);
+    vec2 c_rr(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f);
+
     vec2 centers[4];
-    centers[0].set(x + halfW * 0.45f, y + halfH * 0.45f);
-    centers[1].set(x + halfW + halfW * 0.45f, y + halfH * 0.45f);
-    centers[2].set(x + halfW * 0.45f, y + halfH + halfH * 0.45f);
-    centers[3].set(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f);
+    centers[0] = c_fl;
+    centers[1] = c_fr;
+    centers[2] = c_rl;
+    centers[3] = c_rr;
 
-    string labels[4];
-    labels[0] = "FL";
-    labels[1] = "FR";
-    labels[2] = "RL";
-    labels[3] = "RR";
-
-    CAudioSourceSurface::ESurfId mats[4];
-    mats[0] = state.FLGroundContactMaterial;
-    mats[1] = state.FRGroundContactMaterial;
-    mats[2] = state.RLGroundContactMaterial;
-    mats[3] = state.RRGroundContactMaterial;
-
+    // Draw each wheel: FL=0, FR=1, RL=2, RR=3
     for (int i = 0; i < 4; i++) {
         vec2 c = centers[i];
-        vec4 col = SurfaceMaterialColor(mats[i]);
-        string matName = SurfaceMaterialName(mats[i]);
+        CAudioSourceSurface::ESurfId mat;
+        string wlabel;
+        if (i == 0) { mat = state.FLGroundContactMaterial; wlabel = "FL"; }
+        else if (i == 1) { mat = state.FRGroundContactMaterial; wlabel = "FR"; }
+        else if (i == 2) { mat = state.RLGroundContactMaterial; wlabel = "RL"; }
+        else { mat = state.RRGroundContactMaterial; wlabel = "RR"; }
+
+        vec4 col = SurfaceMaterialColor(mat);
+        string matName = SurfaceMaterialName(mat);
 
         // Colored circle with glow
         // Glow (larger, semi-transparent)
@@ -743,7 +745,7 @@ void RenderSurfaces() {
         nvg::FontSize(labelFontSize);
         nvg::FillColor(vec4(0.55f, 0.60f, 0.70f, 0.8f));
         nvg::TextAlign(nvg::Align::Top | nvg::Align::Left);
-        nvg::TextBox(vec2(c.x - circleR, c.y - circleR - labelFontSize - 2), circleR * 2, labels[i]);
+        nvg::TextBox(vec2(c.x - circleR, c.y - circleR - labelFontSize - 2), circleR * 2, wlabel);
 
         // Material name — below circle, centered
         nvg::BeginPath();
