@@ -508,6 +508,132 @@ string SurfaceMaterialName(CAudioSourceSurface::ESurfId mat) {
 /**
  * Draws the schematic overlay of wheel placements with their active original material names.
  */
+// ---------------------------------------------------------------------------
+// Surface overlay — per-wheel ground contact material display
+// ---------------------------------------------------------------------------
+// Renders a polished wheel-surface panel: 2x2 grid with colored circles
+// representing each wheel (FL, FR, RL, RR). Circle color reflects the
+// surface type (green=road, brown=dirt, blue=ice, etc.). Material name
+// and wheel label shown alongside. Position/size configurable via settings.
+// ---------------------------------------------------------------------------
+
+// Map a surface material to a display color for the wheel circle.
+#if MP4
+vec4 SurfaceMaterialColor(CAudioSourceSurface::ESurfId mat) {
+    switch (mat) {
+        // road — green
+        case CAudioSourceSurface::ESurfId::Concrete:
+        case CAudioSourceSurface::ESurfId::Asphalt:
+        case CAudioSourceSurface::ESurfId::Pavement:
+        case CAudioSourceSurface::ESurfId::WetAsphalt:
+        case CAudioSourceSurface::ESurfId::WetPavement:
+        case CAudioSourceSurface::ESurfId::PavementStair:             return vec4(0.20f, 0.75f, 0.35f, 1.0f);
+
+        // grass / nature — green-yellow
+        case CAudioSourceSurface::ESurfId::Grass:
+        case CAudioSourceSurface::ESurfId::WetGrass:
+        case CAudioSourceSurface::ESurfId::Forest:
+        case CAudioSourceSurface::ESurfId::Wheat:                     return vec4(0.45f, 0.80f, 0.20f, 1.0f);
+
+        // dirt / gravel — brown
+        case CAudioSourceSurface::ESurfId::Dirt:
+        case CAudioSourceSurface::ESurfId::DirtRoad:
+        case CAudioSourceSurface::ESurfId::WetDirtRoad:
+        case CAudioSourceSurface::ESurfId::Gravel:                    return vec4(0.70f, 0.45f, 0.15f, 1.0f);
+
+        // sand — tan
+        case CAudioSourceSurface::ESurfId::Sand:                      return vec4(0.85f, 0.75f, 0.40f, 1.0f);
+
+        // rock / stone — grey
+        case CAudioSourceSurface::ESurfId::Rock:
+        case CAudioSourceSurface::ESurfId::Stone:                     return vec4(0.55f, 0.55f, 0.58f, 1.0f);
+
+        // wood — amber
+        case CAudioSourceSurface::ESurfId::Wood:
+        case CAudioSourceSurface::ESurfId::Trunk:
+        case CAudioSourceSurface::ESurfId::SlidingWood:               return vec4(0.75f, 0.55f, 0.20f, 1.0f);
+
+        // snow — white-blue
+        case CAudioSourceSurface::ESurfId::Snow:                      return vec4(0.80f, 0.88f, 0.98f, 1.0f);
+
+        // water — blue
+        case CAudioSourceSurface::ESurfId::Water:                     return vec4(0.20f, 0.50f, 0.90f, 1.0f);
+
+        // metal — steel
+        case CAudioSourceSurface::ESurfId::Metal:
+        case CAudioSourceSurface::ESurfId::MetalFence:                return vec4(0.60f, 0.65f, 0.75f, 1.0f);
+        case CAudioSourceSurface::ESurfId::ResonantMetal:             return vec4(0.50f, 0.55f, 0.65f, 1.0f);
+        case CAudioSourceSurface::ESurfId::MetalTrans:                return vec4(0.65f, 0.70f, 0.80f, 1.0f);
+
+        // ice — cyan
+        case CAudioSourceSurface::ESurfId::Ice:
+        case CAudioSourceSurface::ESurfId::CustomIce:                 return vec4(0.40f, 0.85f, 0.95f, 1.0f);
+
+        // turbo / boost — orange
+        case CAudioSourceSurface::ESurfId::Turbo:                     return vec4(0.95f, 0.50f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Turbo2:                    return vec4(0.95f, 0.30f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TurboRoulette:             return vec4(0.95f, 0.50f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TurboWood:                 return vec4(0.85f, 0.55f, 0.15f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Turbo2Wood:                return vec4(0.85f, 0.40f, 0.10f, 1.0f);
+
+        // magnetic — purple
+        case CAudioSourceSurface::ESurfId::TechMagnetic:              return vec4(0.65f, 0.30f, 0.90f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TurboTechMagnetic:        return vec4(0.75f, 0.35f, 0.85f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Turbo2TechMagnetic:       return vec4(0.75f, 0.25f, 0.80f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechMagneticAccel:        return vec4(0.60f, 0.20f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechSuperMagnetic:        return vec4(0.80f, 0.20f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::FreeWheeling:              return vec4(0.50f, 0.50f, 0.50f, 1.0f);
+        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return vec4(0.60f, 0.40f, 0.80f, 1.0f);
+        case CAudioSourceSurface::ESurfId::FreeWheelingWood:          return vec4(0.60f, 0.45f, 0.25f, 1.0f);
+
+        // barriers / rubber — red
+        case CAudioSourceSurface::ESurfId::Rubber:
+        case CAudioSourceSurface::ESurfId::SlidingRubber:
+        case CAudioSourceSurface::ESurfId::RubberBand:                return vec4(0.90f, 0.20f, 0.20f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Bumper:                    return vec4(0.85f, 0.15f, 0.15f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Bumper2:                   return vec4(0.95f, 0.10f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::WallJump:                  return vec4(0.80f, 0.25f, 0.25f, 1.0f);
+        case CAudioSourceSurface::ESurfId::NotCollidable:             return vec4(0.50f, 0.50f, 0.50f, 0.5f);
+
+        // special — yellow
+        case CAudioSourceSurface::ESurfId::Danger:                    return vec4(0.95f, 0.80f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Test:                      return vec4(0.90f, 0.90f, 0.20f, 1.0f);
+        case CAudioSourceSurface::ESurfId::GolfBall:
+        case CAudioSourceSurface::ESurfId::GolfWall:
+        case CAudioSourceSurface::ESurfId::GolfGround:                return vec4(0.30f, 0.85f, 0.40f, 1.0f);
+        case CAudioSourceSurface::ESurfId::OffZone:                   return vec4(0.95f, 0.50f, 0.05f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Bullet:                    return vec4(0.90f, 0.60f, 0.10f, 1.0f);
+        case CAudioSourceSurface::ESurfId::Energy:                    return vec4(0.30f, 0.80f, 0.95f, 1.0f);
+
+        // tech zones — teal
+        case CAudioSourceSurface::ESurfId::Tech:                      return vec4(0.20f, 0.80f, 0.75f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechArmor:                 return vec4(0.25f, 0.75f, 0.85f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechSafe:                  return vec4(0.30f, 0.85f, 0.60f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechHook:
+        case CAudioSourceSurface::ESurfId::TechHook2:                 return vec4(0.35f, 0.70f, 0.90f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechGround:                return vec4(0.20f, 0.70f, 0.80f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechWall:                  return vec4(0.30f, 0.65f, 0.85f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechArrow:                 return vec4(0.40f, 0.75f, 0.90f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechTarget:                return vec4(0.25f, 0.80f, 0.70f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechTeleport:              return vec4(0.35f, 0.85f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechLaser:                 return vec4(0.50f, 0.90f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechNucleus:               return vec4(0.30f, 0.75f, 0.90f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechGravityChange:         return vec4(0.40f, 0.60f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::TechGravityReset:          return vec4(0.35f, 0.55f, 0.90f, 1.0f);
+
+        // player / vehicle — white
+        case CAudioSourceSurface::ESurfId::Player:                    return vec4(0.95f, 0.95f, 0.95f, 1.0f);
+        case CAudioSourceSurface::ESurfId::PlayerOnly:                return vec4(0.90f, 0.90f, 0.90f, 1.0f);
+        case CAudioSourceSurface::ESurfId::NoGrip:                    return vec4(0.70f, 0.70f, 0.70f, 1.0f);
+        case CAudioSourceSurface::ESurfId::NoSteering:                return vec4(0.65f, 0.65f, 0.65f, 1.0f);
+        case CAudioSourceSurface::ESurfId::NoBrakes:                  return vec4(0.60f, 0.60f, 0.60f, 1.0f);
+
+        // unknown — dim grey
+        default:                                                     return vec4(0.40f, 0.40f, 0.42f, 0.8f);
+    }
+}
+#endif
+
 void RenderSurfaces() {
 #if !MP4
     return;
@@ -520,64 +646,113 @@ void RenderSurfaces() {
     int displayWidth = Display::GetWidth();
     int displayHeight = Display::GetHeight();
 
+    // Layout: wider panel with wheel circles + labels
+    int panelW = S_SurfaceWidth;
+    int panelH = S_SurfaceHeight;
     int x = int(S_SurfaceX * displayWidth);
     int y = int(S_SurfaceY * displayHeight);
-    int w = S_SurfaceWidth;
-    int h = S_SurfaceHeight;
 
-    float halfW = w * 0.5f;
-    float halfH = h * 0.5f;
+    // Clamp to screen
+    if (x + panelW > displayWidth) x = displayWidth - panelW - 4;
+    if (y + panelH > displayHeight) y = displayHeight - panelH - 4;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
 
-    // Background panel
+    float halfW = panelW * 0.5f;
+    float halfH = panelH * 0.5f;
+
+    // --- Background panel ---
     nvg::BeginPath();
-    nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
-    nvg::FillColor(vec4(0.08f, 0.09f, 0.12f, 0.82f));
+    nvg::RoundedRect(vec2(x, y), vec2(panelW, panelH), 6.0f);
+    nvg::FillColor(vec4(0.06f, 0.07f, 0.10f, 0.88f));
     nvg::Fill();
 
-    // Axis dividers
+    // --- Border ---
+    nvg::StrokeWidth(1.5f);
+    nvg::StrokeColor(vec4(0.35f, 0.45f, 0.65f, 0.5f));
+    nvg::BeginPath();
+    nvg::RoundedRect(vec2(x, y), vec2(panelW, panelH), 6.0f);
+    nvg::Stroke();
+
+    // --- Inner dividers ---
     nvg::StrokeWidth(1.0f);
-    nvg::StrokeColor(vec4(0.3f, 0.35f, 0.45f, 0.5f));
+    nvg::StrokeColor(vec4(0.25f, 0.30f, 0.40f, 0.4f));
+    // vertical
     nvg::BeginPath();
-    nvg::MoveTo(vec2(x + halfW, y));
-    nvg::LineTo(vec2(x + halfW, y + h));
+    nvg::MoveTo(vec2(x + halfW, y + 2));
+    nvg::LineTo(vec2(x + halfW, y + panelH - 2));
     nvg::Stroke();
+    // horizontal
     nvg::BeginPath();
-    nvg::MoveTo(vec2(x, y + halfH));
-    nvg::LineTo(vec2(x + w, y + halfH));
-    nvg::Stroke();
-
-    // Border stroke
-    nvg::StrokeWidth(1.0f);
-    nvg::StrokeColor(vec4(0.5f, 0.6f, 0.8f, 0.4f));
-    nvg::BeginPath();
-    nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
+    nvg::MoveTo(vec2(x + 2, y + halfH));
+    nvg::LineTo(vec2(x + panelW - 2, y + halfH));
     nvg::Stroke();
 
-    // Draw active text values for each wheel position
-    nvg::BeginPath();
-    nvg::FontSize(S_SurfaceFontSize);
-    nvg::FillColor(vec4(0.9f, 0.92f, 0.98f, 1.0f));
-    nvg::TextAlign(nvg::Align::Middle | nvg::Align::Center);
+    // --- Per-wheel rendering ---
+    // Each quadrant: colored circle (left) + material name (right) + wheel label (top)
+    float circleR = Math::Min(halfW, halfH) * 0.30f;
+    float labelFontSize = Math::Max(9.0f, S_SurfaceFontSize * 0.5f);
+    float nameFontSize = S_SurfaceFontSize;
 
-    float frontY = y + halfH * 0.5f;
-    nvg::TextBox(vec2(x + 1, frontY - halfH * 0.5f + 2), halfW - 2,
-        SurfaceMaterialName(state.FLGroundContactMaterial));
-    nvg::TextBox(vec2(x + halfW + 1, frontY - halfH * 0.5f + 2), halfW - 2,
-        SurfaceMaterialName(state.FRGroundContactMaterial));
+    // Wheel positions: FL, FR, RL, RR
+    vec2 centers[4];
+    centers[0] = vec2(x + halfW * 0.45f, y + halfH * 0.45f);       // FL
+    centers[1] = vec2(x + halfW + halfW * 0.45f, y + halfH * 0.45f); // FR
+    centers[2] = vec2(x + halfW * 0.45f, y + halfH + halfH * 0.45f); // RL
+    centers[3] = vec2(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f); // RR
 
-    float rearY = y + halfH + halfH * 0.5f;
-    nvg::TextBox(vec2(x + 1, rearY - halfH * 0.5f + 2), halfW - 2,
-        SurfaceMaterialName(state.RLGroundContactMaterial));
-    nvg::TextBox(vec2(x + halfW + 1, rearY - halfH * 0.5f + 2), halfW - 2,
-        SurfaceMaterialName(state.RRGroundContactMaterial));
+    string labels[4] = {"FL", "FR", "RL", "RR"};
+    CAudioSourceSurface::ESurfId mats[4];
+    mats[0] = state.FLGroundContactMaterial;
+    mats[1] = state.FRGroundContactMaterial;
+    mats[2] = state.RLGroundContactMaterial;
+    mats[3] = state.RRGroundContactMaterial;
 
-    // Corner layout legends (FL, FR, RL, RR)
-    nvg::FontSize(Math::Max(8.0f, S_SurfaceFontSize * 0.55f));
-    nvg::FillColor(vec4(0.5f, 0.55f, 0.65f, 0.7f));
-    nvg::TextBox(vec2(x, y + 2), halfW, "FL");
-    nvg::TextBox(vec2(x + halfW, y + 2), halfW, "FR");
-    nvg::TextBox(vec2(x, y + halfH + 2), halfW, "RL");
-    nvg::TextBox(vec2(x + halfW, y + halfH + 2), halfW, "RR");
+    for (int i = 0; i < 4; i++) {
+        vec2 c = centers[i];
+        vec4 col = SurfaceMaterialColor(mats[i]);
+        string matName = SurfaceMaterialName(mats[i]);
+
+        // Colored circle with glow
+        // Glow (larger, semi-transparent)
+        nvg::BeginPath();
+        nvg::Circle(c, circleR * 1.4f);
+        nvg::FillColor(vec4(col.x, col.y, col.z, 0.15f));
+        nvg::Fill();
+
+        // Main circle
+        nvg::BeginPath();
+        nvg::Circle(c, circleR);
+        nvg::FillColor(col);
+        nvg::Fill();
+
+        // Circle border
+        nvg::StrokeWidth(1.5f);
+        nvg::StrokeColor(vec4(1.0f, 1.0f, 1.0f, 0.3f));
+        nvg::BeginPath();
+        nvg::Circle(c, circleR);
+        nvg::Stroke();
+
+        // Wheel label (FL/FR/RL/RR) — top-left of quadrant
+        nvg::BeginPath();
+        nvg::FontSize(labelFontSize);
+        nvg::FillColor(vec4(0.55f, 0.60f, 0.70f, 0.8f));
+        nvg::TextAlign(nvg::Align::Top | nvg::Align::Left);
+        nvg::TextBox(vec2(c.x - circleR, c.y - circleR - labelFontSize - 2), circleR * 2, labels[i]);
+
+        // Material name — below circle, centered
+        nvg::BeginPath();
+        nvg::FontSize(nameFontSize);
+        // Text color: white on dark surfaces, dark on bright surfaces
+        float luma = col.x * 0.299f + col.y * 0.587f + col.z * 0.114f;
+        if (luma > 0.6f) {
+            nvg::FillColor(vec4(0.08f, 0.08f, 0.10f, 1.0f));
+        } else {
+            nvg::FillColor(vec4(0.92f, 0.94f, 0.98f, 1.0f));
+        }
+        nvg::TextAlign(nvg::Align::Top | nvg::Align::Center);
+        nvg::TextBox(vec2(c.x - circleR - 4, c.y + circleR + 3), circleR * 2 + 8, matName);
+    }
 #endif
 }
 

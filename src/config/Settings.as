@@ -60,14 +60,14 @@ float S_SurfaceX = 0.82;
 [Setting category="Surfaces" name="Overlay Y (0-1)" min=0 max=1]
 float S_SurfaceY = 0.70;
 
-[Setting category="Surfaces" name="Overlay Width" min=60 max=400]
-int S_SurfaceWidth = 140;
+[Setting category="Surfaces" name="Overlay Width" min=100 max=500]
+int S_SurfaceWidth = 200;
 
-[Setting category="Surfaces" name="Overlay Height" min=40 max=300]
-int S_SurfaceHeight = 80;
+[Setting category="Surfaces" name="Overlay Height" min=60 max=400]
+int S_SurfaceHeight = 130;
 
 [Setting category="Surfaces" name="Font Size" min=8 max=32]
-float S_SurfaceFontSize = 12.0f;
+float S_SurfaceFontSize = 11.0f;
 
 [Setting category="Surfaces" name="Show Raw Material IDs"]
 bool S_SurfaceRaw = false;
