@@ -385,66 +385,108 @@ void Render() {
 // Surface overlay — per-wheel ground contact material display
 // ---------------------------------------------------------------------------
 
-#if TMNEXT
-string SurfaceMaterialName(EPlugSurfaceMaterialId mat) {
-    if (S_SurfaceRaw) return tostring(mat);
-    switch (mat) {
-        case EPlugSurfaceMaterialId::Concrete:
-        case EPlugSurfaceMaterialId::Asphalt:           return "road";
-        case EPlugSurfaceMaterialId::Grass:             return "grass";
-        case EPlugSurfaceMaterialId::Ice:
-        case EPlugSurfaceMaterialId::RoadIce:           return "ice";
-        case EPlugSurfaceMaterialId::Metal:             return "metal";
-        case EPlugSurfaceMaterialId::Sand:              return "sand";
-        case EPlugSurfaceMaterialId::Dirt:              return "dirt";
-        case EPlugSurfaceMaterialId::Rubber:            return "border";
-        case EPlugSurfaceMaterialId::Rock:              return "rock";
-        case EPlugSurfaceMaterialId::Water:             return "water";
-        case EPlugSurfaceMaterialId::Wood:              return "wood";
-        case EPlugSurfaceMaterialId::Snow:              return "snow";
-        case EPlugSurfaceMaterialId::ResonantMetal:     return "trackwall";
-        case EPlugSurfaceMaterialId::MetalTrans:        return "signage";
-        case EPlugSurfaceMaterialId::TechMagnetic:
-        case EPlugSurfaceMaterialId::TechSuperMagnetic: return "magnet";
-        case EPlugSurfaceMaterialId::TechMagneticAccel: return "magnet";
-        case EPlugSurfaceMaterialId::RoadSynthetic:     return "sausage";
-        case EPlugSurfaceMaterialId::Green:             return "grass";
-        case EPlugSurfaceMaterialId::Plastic:           return "plastic";
-        case EPlugSurfaceMaterialId::XXX_Null:          return "air";
-        default:                                        return tostring(mat);
-    }
-}
-#elif MP4 || TURBO
+#if MP4
 string SurfaceMaterialName(CAudioSourceSurface::ESurfId mat) {
     if (S_SurfaceRaw) return tostring(mat);
     switch (mat) {
+        // --- road surfaces ---
         case CAudioSourceSurface::ESurfId::Concrete:
-        case CAudioSourceSurface::ESurfId::Asphalt:                  return "road";
-        case CAudioSourceSurface::ESurfId::Grass:                    return "grass";
-        case CAudioSourceSurface::ESurfId::Metal:                    return "metal";
+        case CAudioSourceSurface::ESurfId::Asphalt:
+        case CAudioSourceSurface::ESurfId::Pavement:
+        case CAudioSourceSurface::ESurfId::WetAsphalt:
+        case CAudioSourceSurface::ESurfId::WetPavement:
+        case CAudioSourceSurface::ESurfId::PavementStair:             return "road";
+
+        // --- off-road terrain ---
+        case CAudioSourceSurface::ESurfId::Grass:
+        case CAudioSourceSurface::ESurfId::WetGrass:
+        case CAudioSourceSurface::ESurfId::Forest:
+        case CAudioSourceSurface::ESurfId::Wheat:                     return "grass";
         case CAudioSourceSurface::ESurfId::Dirt:
-        case CAudioSourceSurface::ESurfId::DirtRoad:                 return "dirt";
-        case CAudioSourceSurface::ESurfId::Turbo:                    return "turbo";
-        case CAudioSourceSurface::ESurfId::Rubber:
-        case CAudioSourceSurface::ESurfId::WetDirtRoad:              return "wet dirt";
-        case CAudioSourceSurface::ESurfId::Turbo2:                   return "red turbo";
-        case CAudioSourceSurface::ESurfId::Bumper:                   return "bumper";
-        case CAudioSourceSurface::ESurfId::FreeWheeling:             return "free wheel";
-        case CAudioSourceSurface::ESurfId::Rock:                     return "rock";
-        case CAudioSourceSurface::ESurfId::Sand:                     return "sand";
-        case CAudioSourceSurface::ESurfId::Wood:                     return "wood";
-        case CAudioSourceSurface::ESurfId::TechMagnetic:             return "magnet";
+        case CAudioSourceSurface::ESurfId::DirtRoad:
+        case CAudioSourceSurface::ESurfId::WetDirtRoad:
+        case CAudioSourceSurface::ESurfId::Gravel:                    return "dirt";
+        case CAudioSourceSurface::ESurfId::Sand:                      return "sand";
+        case CAudioSourceSurface::ESurfId::Rock:
+        case CAudioSourceSurface::ESurfId::Stone:                     return "rock";
+        case CAudioSourceSurface::ESurfId::Wood:
+        case CAudioSourceSurface::ESurfId::Trunk:
+        case CAudioSourceSurface::ESurfId::SlidingWood:               return "wood";
+        case CAudioSourceSurface::ESurfId::Snow:                      return "snow";
+        case CAudioSourceSurface::ESurfId::Water:                     return "water";
+
+        // --- metal & tech ---
+        case CAudioSourceSurface::ESurfId::Metal:
+        case CAudioSourceSurface::ESurfId::MetalFence:                return "metal";
+        case CAudioSourceSurface::ESurfId::ResonantMetal:             return "trackwall";
+        case CAudioSourceSurface::ESurfId::MetalTrans:                return "signage";
+
+        // --- ice ---
+        case CAudioSourceSurface::ESurfId::Ice:
+        case CAudioSourceSurface::ESurfId::CustomIce:                 return "ice";
+
+        // --- boost / turbo ---
+        case CAudioSourceSurface::ESurfId::Turbo:                     return "turbo";
+        case CAudioSourceSurface::ESurfId::Turbo2:                    return "red turbo";
+        case CAudioSourceSurface::ESurfId::TurboRoulette:             return "turbo";
+        case CAudioSourceSurface::ESurfId::TurboWood:                 return "wood turbo";
+        case CAudioSourceSurface::ESurfId::Turbo2Wood:                return "red wood turbo";
+        case CAudioSourceSurface::ESurfId::TechMagnetic:              return "magnet";
         case CAudioSourceSurface::ESurfId::TurboTechMagnetic:        return "mag turbo";
-        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return "mag free";
+        case CAudioSourceSurface::ESurfId::Turbo2TechMagnetic:       return "mag red turbo";
+        case CAudioSourceSurface::ESurfId::TechMagneticAccel:        return "mag fast";
         case CAudioSourceSurface::ESurfId::TechSuperMagnetic:        return "super mag";
-#if MP4
-        case CAudioSourceSurface::ESurfId::RubberBand:               return "border";
-        case CAudioSourceSurface::ESurfId::NoGrip:                   return "no grip";
-        case CAudioSourceSurface::ESurfId::Bumper2:                  return "red bumper";
-        case CAudioSourceSurface::ESurfId::NoSteering:               return "no steer";
-        case CAudioSourceSurface::ESurfId::NoBrakes:                 return "no brake";
-#endif
-        default:                                                     return tostring(mat);
+        case CAudioSourceSurface::ESurfId::FreeWheeling:              return "free wheel";
+        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return "mag free";
+        case CAudioSourceSurface::ESurfId::FreeWheelingWood:          return "wood free";
+
+        // --- colliders / barriers ---
+        case CAudioSourceSurface::ESurfId::Rubber:
+        case CAudioSourceSurface::ESurfId::SlidingRubber:
+        case CAudioSourceSurface::ESurfId::RubberBand:                return "border";
+        case CAudioSourceSurface::ESurfId::Bumper:                    return "bumper";
+        case CAudioSourceSurface::ESurfId::Bumper2:                   return "red bumper";
+        case CAudioSourceSurface::ESurfId::WallJump:                  return "wall";
+        case CAudioSourceSurface::ESurfId::NotCollidable:             return "no col";
+
+        // --- special ---
+        case CAudioSourceSurface::ESurfId::Danger:                    return "danger";
+        case CAudioSourceSurface::ESurfId::Test:                      return "test";
+        case CAudioSourceSurface::ESurfId::GolfBall:                  return "golf";
+        case CAudioSourceSurface::ESurfId::GolfWall:
+        case CAudioSourceSurface::ESurfId::GolfGround:                return "golf";
+        case CAudioSourceSurface::ESurfId::OffZone:                   return "offzone";
+        case CAudioSourceSurface::ESurfId::Bullet:                    return "bullet";
+        case CAudioSourceSurface::ESurfId::Energy:                    return "energy";
+
+        // --- tech zones ---
+        case CAudioSourceSurface::ESurfId::Tech:                      return "tech";
+        case CAudioSourceSurface::ESurfId::TechArmor:                 return "armor";
+        case CAudioSourceSurface::ESurfId::TechSafe:                  return "safe";
+        case CAudioSourceSurface::ESurfId::TechHook:
+        case CAudioSourceSurface::ESurfId::TechHook2:                 return "hook";
+        case CAudioSourceSurface::ESurfId::TechGround:                return "t.ground";
+        case CAudioSourceSurface::ESurfId::TechWall:                  return "t.wall";
+        case CAudioSourceSurface::ESurfId::TechArrow:                 return "arrow";
+        case CAudioSourceSurface::ESurfId::TechTarget:                return "target";
+        case CAudioSourceSurface::ESurfId::TechTeleport:              return "teleport";
+        case CAudioSourceSurface::ESurfId::TechLaser:                 return "laser";
+        case CAudioSourceSurface::ESurfId::TechNucleus:               return "nucleus";
+        case CAudioSourceSurface::ESurfId::TechGravityChange:         return "grav+";
+        case CAudioSourceSurface::ESurfId::TechGravityReset:          return "grav=";
+
+        // --- player / vehicle ---
+        case CAudioSourceSurface::ESurfId::Player:                    return "player";
+        case CAudioSourceSurface::ESurfId::PlayerOnly:                return "p.only";
+        case CAudioSourceSurface::ESurfId::NoGrip:                    return "no grip";
+        case CAudioSourceSurface::ESurfId::NoSteering:                return "no steer";
+        case CAudioSourceSurface::ESurfId::NoBrakes:                  return "no brake";
+
+        // --- unknown ---
+        default: {
+            // "Surface_XX" so the player can report it
+            return "S_" + tostring(int(mat));
+        }
     }
 }
 #endif
