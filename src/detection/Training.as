@@ -379,7 +379,6 @@ string BuildTrainingSampleJson(CSceneVehicleVisState@ state, float speedKmh, uin
     payload += ",\"source\":\"" + JsonEscape(labelSource) + "\"";
     payload += ",\"motion\":\"" + JsonEscape(motionLabel) + "\"";
     payload += ",\"raw_value\":\"" + JsonEscape(g_CurrentRawValue) + "\"";
-    payload += ",\"texture_path\":\"" + JsonEscape(GetVehicleTexturePath(labelVehicle)) + "\"";
     payload += ",\"speed_kmh\":" + Text::Format("%.3f", speedKmh);
     payload += ",\"gear\":" + Text::Format("%d", state.CurGear);
     payload += ",\"rpm\":" + Text::Format("%.3f", state.RPM);

@@ -1,18 +1,22 @@
 // ============================================================================
-// MP4 Vehicle Detector
+// MP4 Vehicle Detector - UI & Rendering
 // ============================================================================
-// Split module for Plugins/vehicle-detector. Openplanet compiles all .as files
-// in this plugin directory together.
+// UI module for the Vehicle Detector plugin. 
+// Openplanet compiles all .as files in this plugin directory together.
 // ============================================================================
 
-// Section: UI — Menu & Render
-// ============================================================================
+// ----------------------------------------------------------------------------
+// Section: External Detection State & Actions
+// ----------------------------------------------------------------------------
 
 // External detection state (updated from server's latest_detection.json)
 string g_ExternalDetectedLabel = "";
 float g_ExternalDetectedConfidence = 0.0f;
 uint64 g_LastDetectionCheckMs = 0;
 
+/**
+ * Reads the latest external model detection from the JSON file on disk.
+ */
 void UpdateLatestExternalDetection() {
     string path = IO::FromStorageFolder("mp4-vehicle-detector/latest_detection.json");
     if (!IO::FileExists(path)) {
@@ -20,17 +24,25 @@ void UpdateLatestExternalDetection() {
         g_ExternalDetectedConfidence = 0.0f;
         return;
     }
-    Json::Value val = Json::FromFile(path);
+
+    Json::Value@ val = Json::FromFile(path);
     if (val is null) {
         g_ExternalDetectedLabel = "";
         g_ExternalDetectedConfidence = 0.0f;
         return;
     }
-    if (val.Get("label") !is null) g_ExternalDetectedLabel = string(val.Get("label"));
-    if (val.Get("confidence") !is null) g_ExternalDetectedConfidence = Text::ParseFloat(string(val.Get("confidence")));
+
+    if (val.Get("label") !is null) {
+        g_ExternalDetectedLabel = string(val.Get("label"));
+    }
+    if (val.Get("confidence") !is null) {
+        g_ExternalDetectedConfidence = Text::ParseFloat(string(val.Get("confidence")));
+    }
 }
 
-/** Accept the external detection and append it as a Manual selection sample. */
+/**
+ * Accepts the active external detection and appends it to the dataset as a Manual sample.
+ */
 void AcceptExternalDetectionAsManual() {
     if (g_ExternalDetectedLabel.Length == 0) {
         AddTelemetryLine("No external detection available to accept.");
@@ -56,7 +68,13 @@ void AcceptExternalDetectionAsManual() {
 }
 
 
-/** Adds a toggle item to the Openplanet overlay menu. */
+// ----------------------------------------------------------------------------
+// Section: Menu & Basic UI Rendering
+// ----------------------------------------------------------------------------
+
+/**
+ * Draws toggle items inside the Openplanet overlay menu.
+ */
 void RenderMenu() {
     if (UI::MenuItem(Icons::Car + " Vehicle Detector", "", S_ShowWindow)) {
         S_ShowWindow = !S_ShowWindow;
@@ -64,22 +82,21 @@ void RenderMenu() {
     if (UI::MenuItem(Icons::Eye + " Show HUD Overlay", "", S_ShowHudOverlay)) {
         S_ShowHudOverlay = !S_ShowHudOverlay;
     }
-        if (UI::MenuItem(Icons::Eye + " Show Detection Window", "", S_ShowDetectionWindow)) {
-            S_ShowDetectionWindow = !S_ShowDetectionWindow;
-        }
+    if (UI::MenuItem(Icons::Eye + " Show Detection Window", "", S_ShowDetectionWindow)) {
+        S_ShowDetectionWindow = !S_ShowDetectionWindow;
+    }
 }
 
-/** Draws a compact always-visible HUD with vehicle and training status. */
+/**
+ * Draws a compact always-visible HUD panel with live training and vehicle status.
+ */
 void RenderHudOverlay() {
 #if !MP4
     return;
 #else
     if (!S_ShowHudOverlay) return;
 
-    const uint flags =
-        UI::WindowFlags::NoSavedSettings |
-        UI::WindowFlags::NoCollapse;
-
+    const uint flags = UI::WindowFlags::NoSavedSettings | UI::WindowFlags::NoCollapse;
     UI::SetNextWindowSize(120, 0, UI::Cond::FirstUseEver);
 
     if (UI::Begin(Icons::Car + " Vehicle HUD", flags)) {
@@ -88,32 +105,26 @@ void RenderHudOverlay() {
             g_LastDetectionCheckMs = Time::Now;
             UpdateLatestExternalDetection();
         }
+
+        // Training control buttons
         if (!g_TrainingCaptureArmed) {
-            if (UI::Button("Start training")) {
-                StartTrainingSession();
-            }
+            if (UI::Button("Start training")) StartTrainingSession();
         } else if (g_TrainingCapturePaused) {
-            if (UI::Button("Resume training")) {
-                ResumeTrainingSession();
-            }
+            if (UI::Button("Resume training")) ResumeTrainingSession();
             UI::SameLine();
-            if (UI::Button("Stop")) {
-                StopTrainingSession();
-            }
+            if (UI::Button("Stop")) StopTrainingSession();
         } else {
-            if (UI::Button("Pause training")) {
-                PauseTrainingSession();
-            }
+            if (UI::Button("Pause training")) PauseTrainingSession();
             UI::SameLine();
-            if (UI::Button("Stop")) {
-                StopTrainingSession();
-            }
+            if (UI::Button("Stop")) StopTrainingSession();
         }
 
+        // Status details
         UI::TextDisabled("State: " + (g_TrainingCaptureArmed ? (g_TrainingCapturePaused ? "Paused" : "Running") : "Stopped"));
         UI::Text("Training: " + (g_TrainingCaptureActive ? "Active" : "Inactive"));
         UI::TextDisabled("Mode: " + (S_ContinuousTrainingCapture ? "Continuous" : "Impact triggered"));
         UI::TextDisabled("Motion: " + g_TrainingMotionLabel);
+
         if (g_TrainingCaptureActive) {
             float elapsedSec = float(Time::Now - g_TrainingCaptureStartMs) / 1000.0f;
             UI::Text("Segment time: " + Text::Format("%.2f s", elapsedSec));
@@ -121,6 +132,7 @@ void RenderHudOverlay() {
             UI::TextDisabled("Waiting for data.");
         }
 
+        // Vehicle labels
         if (g_SelectedTrainingVehicle.Length > 0) {
             UI::TextDisabled("Label: " + ToPrettyVehicleName(g_SelectedTrainingVehicle));
         } else if (g_TrainingLockedVehicle.Length > 0) {
@@ -129,9 +141,9 @@ void RenderHudOverlay() {
             UI::TextDisabled("Label: Auto (Detection)");
         }
 
-        // External model detection (from server)
+        // Server-side model inference results
         if (g_ExternalDetectedLabel.Length > 0) {
-            UI::Text("External detection: " + ToPrettyVehicleName(g_ExternalDetectedLabel) + " (" + Text::Format("%.0f", g_ExternalDetectedConfidence*100.0f) + "%)");
+            UI::Text("External detection: " + ToPrettyVehicleName(g_ExternalDetectedLabel) + " (" + Text::Format("%.0f", g_ExternalDetectedConfidence * 100.0f) + "%)");
         } else {
             UI::TextDisabled("External detection: unknown");
         }
@@ -140,6 +152,7 @@ void RenderHudOverlay() {
             UI::TextDisabled("Vehicle changed in game; training label stays locked.");
         }
 
+        // Dropdown selection for active training vehicle
         UI::SetNextItemWidth(UI::GetContentRegionAvail().x);
         if (UI::BeginCombo("##hud", g_SelectedTrainingVehicle.Length > 0 ? ToPrettyVehicleName(g_SelectedTrainingVehicle) : "Select the vehicle")) {
             if (UI::Selectable("Select the vehicle", g_SelectedTrainingVehicle.Length == 0)) {
@@ -154,16 +167,19 @@ void RenderHudOverlay() {
             }
             UI::EndCombo();
         }
-            UI::SameLine();
-            if (UI::Button("Accept detection as Manual")) {
-                AcceptExternalDetectionAsManual();
-            }
+
+        UI::SameLine();
+        if (UI::Button("Accept detection as Manual")) {
+            AcceptExternalDetectionAsManual();
+        }
     }
     UI::End();
 #endif
 }
 
-/** Renders a larger detection window showing detected vehicle, thumbnail and actions. */
+/**
+ * Renders a larger detection window showing active vehicle, confidence, thumbnail, and config.
+ */
 void RenderDetectionWindow() {
 #if !MP4
     return;
@@ -172,6 +188,7 @@ void RenderDetectionWindow() {
 
     const uint flags = UI::WindowFlags::NoSavedSettings;
     UI::SetNextWindowSize(260, 160, UI::Cond::FirstUseEver);
+
     if (!UI::Begin(Icons::Car + " Detected Vehicle", S_ShowDetectionWindow, flags)) {
         UI::End();
         return;
@@ -194,31 +211,31 @@ void RenderDetectionWindow() {
             UI::TextDisabled("No thumbnail available.");
         }
 
+        // Export toggle configurations
         if (S_EnableTrainingExport) {
             UI::Text("Export: Enabled");
-            if (UI::Button("Disable export")) {
-                S_EnableTrainingExport = false;
-            }
+            if (UI::Button("Disable export")) S_EnableTrainingExport = false;
         } else {
             UI::Text("Export: Disabled");
-            if (UI::Button("Enable export")) {
-                S_EnableTrainingExport = true;
-            }
+            if (UI::Button("Enable export")) S_EnableTrainingExport = true;
         }
+
         if (UI::Button("Accept detection as Manual")) {
             AcceptExternalDetectionAsManual();
         }
-        UI::TextWrapped("Tip: enable export and use Manual selection while driving to collect more trusted samples for underrepresented vehicles.");
+        UI::TextWrapped("Tip: enable export and use Manual selection while driving to collect more trusted samples.");
     }
 
     UI::End();
 #endif
 }
 
-/** Draws the main plugin window. On non-MP4 builds shows a warning instead. */
+/**
+ * Main plugin telemetry window. Renders incompatibility notices on non-MP4 setups.
+ */
 void Render() {
 #if !MP4
-    // --- Non-MP4: show incompatibility notice ---
+    // --- Incompatible build (Not Maniaplanet 4) ---
     if (!S_ShowWindow) return;
     if (UI::Begin(Icons::Car + " Vehicle Detector", S_ShowWindow)) {
         UI::Text("This plugin is designed for ManiaPlanet 4.");
@@ -226,7 +243,7 @@ void Render() {
     UI::End();
     return;
 #else
-    // --- MP4: full UI ---
+    // --- Full ManiaPlanet 4 execution panel ---
     RenderHudOverlay();
     RenderDetectionWindow();
     if (!S_ShowWindow) return;
@@ -237,7 +254,7 @@ void Render() {
         return;
     }
 
-    // Current vehicle info
+    // Active vehicle properties
     UI::Text("Current vehicle:");
     UI::Separator();
     UI::Text(g_CurrentDisplayName);
@@ -247,7 +264,7 @@ void Render() {
         UI::TextWrapped("Raw: " + g_CurrentRawValue);
     }
 
-    // Vehicle thumbnail
+    // Graphic render thumbnail
     UI::Separator();
     UI::Texture@ tex = GetVehicleTexture(g_CurrentVehicle);
     if (tex !is null) {
@@ -258,11 +275,11 @@ void Render() {
         UI::TextDisabled("No thumbnail available for this entry.");
     }
 
-    // Live VehicleState telemetry
+    // Live telemetry properties (VehicleState)
     auto state = VehicleState::ViewingPlayerState();
     if (state !is null) {
         UI::Separator();
-        UI::Text("VehicleState:");
+        UI::Text("VehicleState telemetry:");
         UI::Text("Speed: " + Text::Format("%.1f km/h", state.FrontSpeed * 3.6f));
         UI::Text("Gear: " + Text::Format("%d", state.CurGear));
         UI::Text("Gas: " + Text::Format("%.2f", state.InputGasPedal));
@@ -278,9 +295,9 @@ void Render() {
         UI::Text("Surface: " + GetSurfaceSummary());
     }
 
-    // 0-100 km/h timing section
+    // 0-100 km/h acceleration testing
     UI::Separator();
-    UI::Text("0-100 km/h:");
+    UI::Text("0-100 km/h timings:");
     if (g_RunActive) {
         float elapsedSec = float(Time::Now - g_RunStartMs) / 1000.0f;
         UI::Text("Measurement in progress: " + Text::Format("%.2f s", elapsedSec));
@@ -293,8 +310,9 @@ void Render() {
         UI::Text("Best time: " + Text::Format("%.2f s", g_BestZeroToHundredSec));
     }
 
+    // Session controls and ports
     UI::Separator();
-    UI::Text("Training / Telemetry:");
+    UI::Text("Training / Telemetry exports:");
     UI::TextDisabled("Collecting trusted labels only: Manual selection");
     UI::TextDisabled("Model inference: warm-start=6, conf>=60%, smoothing=2/3 (server)");
     UI::TextDisabled("Latest external detection: Plugins/vehicle-detector-dev/tools/results/latest_detection.json");
@@ -303,27 +321,19 @@ void Render() {
     UI::TextDisabled("Hotkeys: Win+M, Menu or Ctrl+M pause/resume, M stop");
     UI::Text("Current training run: #" + Text::Format("%d", g_TrainingRunId));
     UI::Text("Network export status: " + (S_EnableTrainingExport ? "Enabled" : "Disabled"));
+
     if (!g_TrainingCaptureArmed) {
-        if (UI::Button("Start training##main")) {
-            StartTrainingSession();
-        }
+        if (UI::Button("Start training##main")) StartTrainingSession();
     } else if (g_TrainingCapturePaused) {
-        if (UI::Button("Resume training##main")) {
-            ResumeTrainingSession();
-        }
+        if (UI::Button("Resume training##main")) ResumeTrainingSession();
         UI::SameLine();
-        if (UI::Button("Stop training##main")) {
-            StopTrainingSession();
-        }
+        if (UI::Button("Stop training##main")) StopTrainingSession();
     } else {
-        if (UI::Button("Pause training##main")) {
-            PauseTrainingSession();
-        }
+        if (UI::Button("Pause training##main")) PauseTrainingSession();
         UI::SameLine();
-        if (UI::Button("Stop training##main")) {
-            StopTrainingSession();
-        }
+        if (UI::Button("Stop training##main")) StopTrainingSession();
     }
+
     UI::TextDisabled("State: " + (g_TrainingCaptureArmed ? (g_TrainingCapturePaused ? "Paused" : "Running") : "Stopped"));
     if (g_TrainingCaptureActive) {
         float elapsedSec = float(Time::Now - g_TrainingCaptureStartMs) / 1000.0f;
@@ -333,6 +343,7 @@ void Render() {
         UI::TextDisabled("Training capture waiting for vehicle state.");
     }
 
+    // Local data storage diagnostics
     UI::Separator();
     UI::Text("Dataset Storage:");
     UI::Text("Local save: " + (S_SaveTrainingSamplesToDisk ? "Enabled" : "Disabled"));
@@ -345,6 +356,7 @@ void Render() {
         UI::Text("Last write error: " + g_LastDatasetWriteError);
     }
 
+    // Dropdown config selection
     UI::Separator();
     UI::Text("Training Vehicle Selection:");
     if (UI::BeginCombo("Vehicle##trainingVehicle", g_SelectedTrainingVehicle.Length > 0 ? ToPrettyVehicleName(g_SelectedTrainingVehicle) : "Auto (Detection)")) {
@@ -362,10 +374,10 @@ void Render() {
         UI::EndCombo();
     }
 
-    // Surface overlay
+    // Per-wheel surface overlay
     RenderSurfaces();
 
-    // Collapsible telemetry / debug panel
+    // Telemetry collapsible diagnostics
     if (S_ShowTelemetryPanel && UI::CollapsingHeader("Telemetry / Debug")) {
         UI::TextDisabled("Last update: " + tostring(g_LastTelemetryUpdate));
         if (g_CurrentTelemetry.Length == 0) {
@@ -382,115 +394,120 @@ void Render() {
 }
 
 // ---------------------------------------------------------------------------
-// Surface overlay — per-wheel ground contact material display
+// Section: Per-wheel Surface Layout Overlay (Surface Overlay)
 // ---------------------------------------------------------------------------
 
 #if MP4
+/**
+ * Resolves the surface material ESurfId into its full, original, technical name.
+ */
 string SurfaceMaterialName(CAudioSourceSurface::ESurfId mat) {
     if (S_SurfaceRaw) return tostring(mat);
     switch (mat) {
-        // --- road surfaces ---
-        case CAudioSourceSurface::ESurfId::Concrete:
-        case CAudioSourceSurface::ESurfId::Asphalt:
-        case CAudioSourceSurface::ESurfId::Pavement:
-        case CAudioSourceSurface::ESurfId::WetAsphalt:
-        case CAudioSourceSurface::ESurfId::WetPavement:
-        case CAudioSourceSurface::ESurfId::PavementStair:             return "road";
+        // --- Road surfaces ---
+        case CAudioSourceSurface::ESurfId::Concrete:                  return "Concrete";
+        case CAudioSourceSurface::ESurfId::Asphalt:                   return "Asphalt";
+        case CAudioSourceSurface::ESurfId::Pavement:                  return "Pavement";
+        case CAudioSourceSurface::ESurfId::WetAsphalt:                return "WetAsphalt";
+        case CAudioSourceSurface::ESurfId::WetPavement:               return "WetPavement";
+        case CAudioSourceSurface::ESurfId::PavementStair:             return "PavementStair";
 
-        // --- off-road terrain ---
-        case CAudioSourceSurface::ESurfId::Grass:
-        case CAudioSourceSurface::ESurfId::WetGrass:
-        case CAudioSourceSurface::ESurfId::Forest:
-        case CAudioSourceSurface::ESurfId::Wheat:                     return "grass";
-        case CAudioSourceSurface::ESurfId::Dirt:
-        case CAudioSourceSurface::ESurfId::DirtRoad:
-        case CAudioSourceSurface::ESurfId::WetDirtRoad:
-        case CAudioSourceSurface::ESurfId::Gravel:                    return "dirt";
-        case CAudioSourceSurface::ESurfId::Sand:                      return "sand";
-        case CAudioSourceSurface::ESurfId::Rock:
-        case CAudioSourceSurface::ESurfId::Stone:                     return "rock";
-        case CAudioSourceSurface::ESurfId::Wood:
-        case CAudioSourceSurface::ESurfId::Trunk:
-        case CAudioSourceSurface::ESurfId::SlidingWood:               return "wood";
-        case CAudioSourceSurface::ESurfId::Snow:                      return "snow";
-        case CAudioSourceSurface::ESurfId::Water:                     return "water";
+        // --- Off-road terrain ---
+        case CAudioSourceSurface::ESurfId::Grass:                     return "Grass";
+        case CAudioSourceSurface::ESurfId::WetGrass:                  return "WetGrass";
+        case CAudioSourceSurface::ESurfId::Forest:                    return "Forest";
+        case CAudioSourceSurface::ESurfId::Wheat:                     return "Wheat";
+        case CAudioSourceSurface::ESurfId::Dirt:                      return "Dirt";
+        case CAudioSourceSurface::ESurfId::DirtRoad:                  return "DirtRoad";
+        case CAudioSourceSurface::ESurfId::WetDirtRoad:               return "WetDirtRoad";
+        case CAudioSourceSurface::ESurfId::Gravel:                    return "Gravel";
+        case CAudioSourceSurface::ESurfId::Sand:                      return "Sand";
+        case CAudioSourceSurface::ESurfId::Rock:                      return "Rock";
+        case CAudioSourceSurface::ESurfId::Stone:                     return "Stone";
+        case CAudioSourceSurface::ESurfId::Wood:                      return "Wood";
+        case CAudioSourceSurface::ESurfId::Trunk:                     return "Trunk";
+        case CAudioSourceSurface::ESurfId::SlidingWood:               return "SlidingWood";
+        case CAudioSourceSurface::ESurfId::Snow:                      return "Snow";
+        case CAudioSourceSurface::ESurfId::Water:                     return "Water";
 
-        // --- metal & tech ---
-        case CAudioSourceSurface::ESurfId::Metal:
-        case CAudioSourceSurface::ESurfId::MetalFence:                return "metal";
-        case CAudioSourceSurface::ESurfId::ResonantMetal:             return "trackwall";
-        case CAudioSourceSurface::ESurfId::MetalTrans:                return "signage";
+        // --- Metal & Tech ---
+        case CAudioSourceSurface::ESurfId::Metal:                     return "Metal";
+        case CAudioSourceSurface::ESurfId::MetalFence:                return "MetalFence";
+        case CAudioSourceSurface::ESurfId::ResonantMetal:             return "ResonantMetal";
+        case CAudioSourceSurface::ESurfId::MetalTrans:                return "MetalTrans";
 
-        // --- ice ---
-        case CAudioSourceSurface::ESurfId::Ice:
-        case CAudioSourceSurface::ESurfId::CustomIce:                 return "ice";
+        // --- Ice ---
+        case CAudioSourceSurface::ESurfId::Ice:                       return "Ice";
+        case CAudioSourceSurface::ESurfId::CustomIce:                 return "CustomIce";
 
-        // --- boost / turbo ---
-        case CAudioSourceSurface::ESurfId::Turbo:                     return "turbo";
-        case CAudioSourceSurface::ESurfId::Turbo2:                    return "red turbo";
-        case CAudioSourceSurface::ESurfId::TurboRoulette:             return "turbo";
-        case CAudioSourceSurface::ESurfId::TurboWood:                 return "wood turbo";
-        case CAudioSourceSurface::ESurfId::Turbo2Wood:                return "red wood turbo";
-        case CAudioSourceSurface::ESurfId::TechMagnetic:              return "magnet";
-        case CAudioSourceSurface::ESurfId::TurboTechMagnetic:        return "mag turbo";
-        case CAudioSourceSurface::ESurfId::Turbo2TechMagnetic:       return "mag red turbo";
-        case CAudioSourceSurface::ESurfId::TechMagneticAccel:        return "mag fast";
-        case CAudioSourceSurface::ESurfId::TechSuperMagnetic:        return "super mag";
-        case CAudioSourceSurface::ESurfId::FreeWheeling:              return "free wheel";
-        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return "mag free";
-        case CAudioSourceSurface::ESurfId::FreeWheelingWood:          return "wood free";
+        // --- Boost / Turbo ---
+        case CAudioSourceSurface::ESurfId::Turbo:                     return "Turbo";
+        case CAudioSourceSurface::ESurfId::Turbo2:                    return "Turbo2";
+        case CAudioSourceSurface::ESurfId::TurboRoulette:             return "TurboRoulette";
+        case CAudioSourceSurface::ESurfId::TurboWood:                 return "TurboWood";
+        case CAudioSourceSurface::ESurfId::Turbo2Wood:                return "Turbo2Wood";
+        case CAudioSourceSurface::ESurfId::TechMagnetic:              return "TechMagnetic";
+        case CAudioSourceSurface::ESurfId::TurboTechMagnetic:        return "TurboTechMagnetic";
+        case CAudioSourceSurface::ESurfId::Turbo2TechMagnetic:       return "Turbo2TechMagnetic";
+        case CAudioSourceSurface::ESurfId::TechMagneticAccel:        return "TechMagneticAccel";
+        case CAudioSourceSurface::ESurfId::TechSuperMagnetic:        return "TechSuperMagnetic";
+        case CAudioSourceSurface::ESurfId::FreeWheeling:              return "FreeWheeling";
+        case CAudioSourceSurface::ESurfId::FreeWheelingTechMagnetic: return "FreeWheelingTechMagnetic";
+        case CAudioSourceSurface::ESurfId::FreeWheelingWood:          return "FreeWheelingWood";
 
-        // --- colliders / barriers ---
-        case CAudioSourceSurface::ESurfId::Rubber:
-        case CAudioSourceSurface::ESurfId::SlidingRubber:
-        case CAudioSourceSurface::ESurfId::RubberBand:                return "border";
-        case CAudioSourceSurface::ESurfId::Bumper:                    return "bumper";
-        case CAudioSourceSurface::ESurfId::Bumper2:                   return "red bumper";
-        case CAudioSourceSurface::ESurfId::WallJump:                  return "wall";
-        case CAudioSourceSurface::ESurfId::NotCollidable:             return "no col";
+        // --- Colliders & Barriers ---
+        case CAudioSourceSurface::ESurfId::Rubber:                    return "Rubber";
+        case CAudioSourceSurface::ESurfId::SlidingRubber:             return "SlidingRubber";
+        case CAudioSourceSurface::ESurfId::RubberBand:                return "RubberBand";
+        case CAudioSourceSurface::ESurfId::Bumper:                    return "Bumper";
+        case CAudioSourceSurface::ESurfId::Bumper2:                   return "Bumper2";
+        case CAudioSourceSurface::ESurfId::WallJump:                  return "WallJump";
+        case CAudioSourceSurface::ESurfId::NotCollidable:             return "NotCollidable";
 
-        // --- special ---
-        case CAudioSourceSurface::ESurfId::Danger:                    return "danger";
-        case CAudioSourceSurface::ESurfId::Test:                      return "test";
-        case CAudioSourceSurface::ESurfId::GolfBall:                  return "golf";
-        case CAudioSourceSurface::ESurfId::GolfWall:
-        case CAudioSourceSurface::ESurfId::GolfGround:                return "golf";
-        case CAudioSourceSurface::ESurfId::OffZone:                   return "offzone";
-        case CAudioSourceSurface::ESurfId::Bullet:                    return "bullet";
-        case CAudioSourceSurface::ESurfId::Energy:                    return "energy";
+        // --- Special ---
+        case CAudioSourceSurface::ESurfId::Danger:                    return "Danger";
+        case CAudioSourceSurface::ESurfId::Test:                      return "Test";
+        case CAudioSourceSurface::ESurfId::GolfBall:                  return "GolfBall";
+        case CAudioSourceSurface::ESurfId::GolfWall:                  return "GolfWall";
+        case CAudioSourceSurface::ESurfId::GolfGround:                return "GolfGround";
+        case CAudioSourceSurface::ESurfId::OffZone:                   return "OffZone";
+        case CAudioSourceSurface::ESurfId::Bullet:                    return "Bullet";
+        case CAudioSourceSurface::ESurfId::Energy:                    return "Energy";
 
-        // --- tech zones ---
-        case CAudioSourceSurface::ESurfId::Tech:                      return "tech";
-        case CAudioSourceSurface::ESurfId::TechArmor:                 return "armor";
-        case CAudioSourceSurface::ESurfId::TechSafe:                  return "safe";
-        case CAudioSourceSurface::ESurfId::TechHook:
-        case CAudioSourceSurface::ESurfId::TechHook2:                 return "hook";
-        case CAudioSourceSurface::ESurfId::TechGround:                return "t.ground";
-        case CAudioSourceSurface::ESurfId::TechWall:                  return "t.wall";
-        case CAudioSourceSurface::ESurfId::TechArrow:                 return "arrow";
-        case CAudioSourceSurface::ESurfId::TechTarget:                return "target";
-        case CAudioSourceSurface::ESurfId::TechTeleport:              return "teleport";
-        case CAudioSourceSurface::ESurfId::TechLaser:                 return "laser";
-        case CAudioSourceSurface::ESurfId::TechNucleus:               return "nucleus";
-        case CAudioSourceSurface::ESurfId::TechGravityChange:         return "grav+";
-        case CAudioSourceSurface::ESurfId::TechGravityReset:          return "grav=";
+        // --- Tech Zones ---
+        case CAudioSourceSurface::ESurfId::Tech:                      return "Tech";
+        case CAudioSourceSurface::ESurfId::TechArmor:                 return "TechArmor";
+        case CAudioSourceSurface::ESurfId::TechSafe:                  return "TechSafe";
+        case CAudioSourceSurface::ESurfId::TechHook:                  return "TechHook";
+        case CAudioSourceSurface::ESurfId::TechHook2:                 return "TechHook2";
+        case CAudioSourceSurface::ESurfId::TechGround:                return "TechGround";
+        case CAudioSourceSurface::ESurfId::TechWall:                  return "TechWall";
+        case CAudioSourceSurface::ESurfId::TechArrow:                 return "TechArrow";
+        case CAudioSourceSurface::ESurfId::TechTarget:                return "TechTarget";
+        case CAudioSourceSurface::ESurfId::TechTeleport:              return "TechTeleport";
+        case CAudioSourceSurface::ESurfId::TechLaser:                 return "TechLaser";
+        case CAudioSourceSurface::ESurfId::TechNucleus:               return "TechNucleus";
+        case CAudioSourceSurface::ESurfId::TechGravityChange:         return "TechGravityChange";
+        case CAudioSourceSurface::ESurfId::TechGravityReset:          return "TechGravityReset";
 
-        // --- player / vehicle ---
-        case CAudioSourceSurface::ESurfId::Player:                    return "player";
-        case CAudioSourceSurface::ESurfId::PlayerOnly:                return "p.only";
-        case CAudioSourceSurface::ESurfId::NoGrip:                    return "no grip";
-        case CAudioSourceSurface::ESurfId::NoSteering:                return "no steer";
-        case CAudioSourceSurface::ESurfId::NoBrakes:                  return "no brake";
+        // --- Player / Vehicle ---
+        case CAudioSourceSurface::ESurfId::Player:                    return "Player";
+        case CAudioSourceSurface::ESurfId::PlayerOnly:                return "PlayerOnly";
+        case CAudioSourceSurface::ESurfId::NoGrip:                    return "NoGrip";
+        case CAudioSourceSurface::ESurfId::NoSteering:                return "NoSteering";
+        case CAudioSourceSurface::ESurfId::NoBrakes:                  return "NoBrakes";
 
-        // --- unknown ---
+        // --- Fallback ---
         default: {
-            // "Surface_XX" so the player can report it
-            return "S_" + tostring(int(mat));
+            return "Surface_" + tostring(int(mat));
         }
     }
 }
 #endif
 
+/**
+ * Draws the schematic overlay of wheel placements with their active original material names.
+ */
 void RenderSurfaces() {
 #if !MP4
     return;
@@ -511,13 +528,13 @@ void RenderSurfaces() {
     float halfW = w * 0.5f;
     float halfH = h * 0.5f;
 
-    // background
+    // Background panel
     nvg::BeginPath();
     nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
     nvg::FillColor(vec4(0.08f, 0.09f, 0.12f, 0.82f));
     nvg::Fill();
 
-    // inner cross
+    // Axis dividers
     nvg::StrokeWidth(1.0f);
     nvg::StrokeColor(vec4(0.3f, 0.35f, 0.45f, 0.5f));
     nvg::BeginPath();
@@ -529,14 +546,14 @@ void RenderSurfaces() {
     nvg::LineTo(vec2(x + w, y + halfH));
     nvg::Stroke();
 
-    // border
+    // Border stroke
     nvg::StrokeWidth(1.0f);
     nvg::StrokeColor(vec4(0.5f, 0.6f, 0.8f, 0.4f));
     nvg::BeginPath();
     nvg::RoundedRect(vec2(x, y), vec2(w, h), 4.0f);
     nvg::Stroke();
 
-    // per-wheel material names
+    // Draw active text values for each wheel position
     nvg::BeginPath();
     nvg::FontSize(S_SurfaceFontSize);
     nvg::FillColor(vec4(0.9f, 0.92f, 0.98f, 1.0f));
@@ -554,7 +571,7 @@ void RenderSurfaces() {
     nvg::TextBox(vec2(x + halfW + 1, rearY - halfH * 0.5f + 2), halfW - 2,
         SurfaceMaterialName(state.RRGroundContactMaterial));
 
-    // wheel position labels (tiny, above material names)
+    // Corner layout legends (FL, FR, RL, RR)
     nvg::FontSize(Math::Max(8.0f, S_SurfaceFontSize * 0.55f));
     nvg::FillColor(vec4(0.5f, 0.55f, 0.65f, 0.7f));
     nvg::TextBox(vec2(x, y + 2), halfW, "FL");
@@ -564,7 +581,9 @@ void RenderSurfaces() {
 #endif
 }
 
-/** Helper: return a short surface summary string for use in text HUDs. */
+/**
+ * Returns a compact textual summary representation of the active wheel surfaces.
+ */
 string GetSurfaceSummary() {
 #if !MP4
     return "N/A";
@@ -582,4 +601,3 @@ string GetSurfaceSummary() {
     return fl + "/" + fr + "/" + rl + "/" + rr;
 #endif
 }
-
