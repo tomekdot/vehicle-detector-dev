@@ -696,12 +696,17 @@ void RenderSurfaces() {
 
     // Wheel positions: FL, FR, RL, RR
     vec2 centers[4];
-    centers[0] = vec2(x + halfW * 0.45f, y + halfH * 0.45f);       // FL
-    centers[1] = vec2(x + halfW + halfW * 0.45f, y + halfH * 0.45f); // FR
-    centers[2] = vec2(x + halfW * 0.45f, y + halfH + halfH * 0.45f); // RL
-    centers[3] = vec2(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f); // RR
+    centers[0].set(x + halfW * 0.45f, y + halfH * 0.45f);
+    centers[1].set(x + halfW + halfW * 0.45f, y + halfH * 0.45f);
+    centers[2].set(x + halfW * 0.45f, y + halfH + halfH * 0.45f);
+    centers[3].set(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f);
 
-    string labels[4] = {"FL", "FR", "RL", "RR"};
+    string labels[4];
+    labels[0] = "FL";
+    labels[1] = "FR";
+    labels[2] = "RL";
+    labels[3] = "RR";
+
     CAudioSourceSurface::ESurfId mats[4];
     mats[0] = state.FLGroundContactMaterial;
     mats[1] = state.FRGroundContactMaterial;
