@@ -688,78 +688,63 @@ void RenderSurfaces() {
     nvg::LineTo(vec2(x + panelW - 2, y + halfH));
     nvg::Stroke();
 
-    // --- Per-wheel rendering ---
-    // Each quadrant: colored circle (left) + material name (right) + wheel label (top)
+    // Per-wheel rendering — 4 explicit calls (no loops/arrays — AngelScript limitation)
     float circleR = Math::Min(halfW, halfH) * 0.30f;
-    float labelFontSize = Math::Max(9.0f, S_SurfaceFontSize * 0.5f);
-    float nameFontSize = S_SurfaceFontSize;
+    float lblFontSize = Math::Max(9.0f, S_SurfaceFontSize * 0.5f);
+    float matFontSize = S_SurfaceFontSize;
 
-    // Per-wheel rendering — no inline array init (AngelScript limitation)
-    // Individual wheel variables avoid struct/array issues
-    vec2 c_fl(x + halfW * 0.45f, y + halfH * 0.45f);
-    vec2 c_fr(x + halfW + halfW * 0.45f, y + halfH * 0.45f);
-    vec2 c_rl(x + halfW * 0.45f, y + halfH + halfH * 0.45f);
-    vec2 c_rr(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f);
+    DrawWheelSurface(x + halfW * 0.45f, y + halfH * 0.45f, circleR, lblFontSize, matFontSize, "FL", state.FLGroundContactMaterial);
+    DrawWheelSurface(x + halfW + halfW * 0.45f, y + halfH * 0.45f, circleR, lblFontSize, matFontSize, "FR", state.FRGroundContactMaterial);
+    DrawWheelSurface(x + halfW * 0.45f, y + halfH + halfH * 0.45f, circleR, lblFontSize, matFontSize, "RL", state.RLGroundContactMaterial);
+    DrawWheelSurface(x + halfW + halfW * 0.45f, y + halfH + halfH * 0.45f, circleR, lblFontSize, matFontSize, "RR", state.RRGroundContactMaterial);
+#endif
+}
 
-    vec2 centers[4];
-    centers[0] = c_fl;
-    centers[1] = c_fr;
-    centers[2] = c_rl;
-    centers[3] = c_rr;
+/** Draws a single colored wheel circle with material name label. */
+void DrawWheelSurface(float cx, float cy, float circleR, float lblFontSize, float matFontSize, const string &in label, CAudioSourceSurface::ESurfId mat) {
+#if !MP4
+    return;
+#else
+    vec4 col = SurfaceMaterialColor(mat);
+    string matName = SurfaceMaterialName(mat);
 
-    // Draw each wheel: FL=0, FR=1, RL=2, RR=3
-    for (int i = 0; i < 4; i++) {
-        vec2 c = centers[i];
-        CAudioSourceSurface::ESurfId mat;
-        string wlabel;
-        if (i == 0) { mat = state.FLGroundContactMaterial; wlabel = "FL"; }
-        else if (i == 1) { mat = state.FRGroundContactMaterial; wlabel = "FR"; }
-        else if (i == 2) { mat = state.RLGroundContactMaterial; wlabel = "RL"; }
-        else { mat = state.RRGroundContactMaterial; wlabel = "RR"; }
+    // Glow
+    nvg::BeginPath();
+    nvg::Circle(vec2(cx, cy), circleR * 1.4f);
+    nvg::FillColor(vec4(col.x, col.y, col.z, 0.15f));
+    nvg::Fill();
 
-        vec4 col = SurfaceMaterialColor(mat);
-        string matName = SurfaceMaterialName(mat);
+    // Main circle
+    nvg::BeginPath();
+    nvg::Circle(vec2(cx, cy), circleR);
+    nvg::FillColor(col);
+    nvg::Fill();
 
-        // Colored circle with glow
-        // Glow (larger, semi-transparent)
-        nvg::BeginPath();
-        nvg::Circle(c, circleR * 1.4f);
-        nvg::FillColor(vec4(col.x, col.y, col.z, 0.15f));
-        nvg::Fill();
+    // Circle border
+    nvg::StrokeWidth(1.5f);
+    nvg::StrokeColor(vec4(1.0f, 1.0f, 1.0f, 0.3f));
+    nvg::BeginPath();
+    nvg::Circle(vec2(cx, cy), circleR);
+    nvg::Stroke();
 
-        // Main circle
-        nvg::BeginPath();
-        nvg::Circle(c, circleR);
-        nvg::FillColor(col);
-        nvg::Fill();
+    // Wheel label (FL/FR/RL/RR)
+    nvg::BeginPath();
+    nvg::FontSize(lblFontSize);
+    nvg::FillColor(vec4(0.55f, 0.60f, 0.70f, 0.8f));
+    nvg::TextAlign(nvg::Align::Top | nvg::Align::Left);
+    nvg::TextBox(vec2(cx - circleR, cy - circleR - lblFontSize - 2), circleR * 2, label);
 
-        // Circle border
-        nvg::StrokeWidth(1.5f);
-        nvg::StrokeColor(vec4(1.0f, 1.0f, 1.0f, 0.3f));
-        nvg::BeginPath();
-        nvg::Circle(c, circleR);
-        nvg::Stroke();
-
-        // Wheel label (FL/FR/RL/RR) — top-left of quadrant
-        nvg::BeginPath();
-        nvg::FontSize(labelFontSize);
-        nvg::FillColor(vec4(0.55f, 0.60f, 0.70f, 0.8f));
-        nvg::TextAlign(nvg::Align::Top | nvg::Align::Left);
-        nvg::TextBox(vec2(c.x - circleR, c.y - circleR - labelFontSize - 2), circleR * 2, wlabel);
-
-        // Material name — below circle, centered
-        nvg::BeginPath();
-        nvg::FontSize(nameFontSize);
-        // Text color: white on dark surfaces, dark on bright surfaces
-        float luma = col.x * 0.299f + col.y * 0.587f + col.z * 0.114f;
-        if (luma > 0.6f) {
-            nvg::FillColor(vec4(0.08f, 0.08f, 0.10f, 1.0f));
-        } else {
-            nvg::FillColor(vec4(0.92f, 0.94f, 0.98f, 1.0f));
-        }
-        nvg::TextAlign(nvg::Align::Top | nvg::Align::Center);
-        nvg::TextBox(vec2(c.x - circleR - 4, c.y + circleR + 3), circleR * 2 + 8, matName);
+    // Material name below circle
+    nvg::BeginPath();
+    nvg::FontSize(matFontSize);
+    float luma = col.x * 0.299f + col.y * 0.587f + col.z * 0.114f;
+    if (luma > 0.6f) {
+        nvg::FillColor(vec4(0.08f, 0.08f, 0.10f, 1.0f));
+    } else {
+        nvg::FillColor(vec4(0.92f, 0.94f, 0.98f, 1.0f));
     }
+    nvg::TextAlign(nvg::Align::Top | nvg::Align::Center);
+    nvg::TextBox(vec2(cx - circleR - 4, cy + circleR + 3), circleR * 2 + 8, matName);
 #endif
 }
 
