@@ -12,31 +12,93 @@
 // External detection state (updated from server's latest_detection.json)
 string g_ExternalDetectedLabel = "";
 float g_ExternalDetectedConfidence = 0.0f;
+bool g_ExternalDetectionStale = true;      // file missing, or older than the freshness window
+int64 g_ExternalDetectedAgeSec = 0;
+int64 g_ExternalFileStamp = -1;            // timestamp field of the file, as a dedupe key
 uint64 g_LastDetectionCheckMs = 0;
 
 /**
+ * Reads a string field from a Json::Value, or returns "" when the key is
+ * missing or is not a string. The explicit type check matters: Json::Value's
+ * implicit `string()` conversion THROWS "Json value is not a string!" on a
+ * numeric/boolean field, which used to crash the render loop every frame.
+ */
+string ReadJsonString(Json::Value@ parent, const string &in key) {
+    if (parent is null) return "";
+    Json::Value@ field = parent.Get(key);
+    if (field is null) return "";
+    if (field.GetType() != Json::Type::String) return "";
+    return string(field);
+}
+
+/**
+ * Reads a numeric field from a Json::Value, or returns `fallback` when the
+ * key is missing or is not a number. Booleans are rejected on purpose — a
+ * bool leaking into a confidence/speed field means the file is not what we
+ * expect and the value should not be silently coerced to 0/1.
+ */
+float ReadJsonFloat(Json::Value@ parent, const string &in key, float fallback) {
+    if (parent is null) return fallback;
+    Json::Value@ field = parent.Get(key);
+    if (field is null) return fallback;
+    if (field.GetType() != Json::Type::Number) return fallback;
+    return float(field);
+}
+
+/** Renders an age in seconds compactly: "45 s", "12 min", "135 days". */
+string FormatAge(int64 ageSec) {
+    if (ageSec < 60) return Text::Format("%d s", int(ageSec));
+    if (ageSec < 3600) return Text::Format("%d min", int(ageSec / 60));
+    if (ageSec < 86400) return Text::Format("%d h", int(ageSec / 3600));
+    return Text::Format("%d days", int(ageSec / 86400));
+}
+
+/**
  * Reads the latest external model detection from the JSON file on disk.
+ * Every field is type-checked: the server may be mid-write, or the file may
+ * come from an older/newer format, and a malformed file must never take the
+ * render loop down with it.
+ *
+ * Freshness is checked too. The file persists after the server stops, so
+ * without this a months-old result is displayed as the current car.
  */
 void UpdateLatestExternalDetection() {
+    g_ExternalDetectedLabel = "";
+    g_ExternalDetectedConfidence = 0.0f;
+    g_ExternalDetectionStale = true;
+    g_ExternalDetectedAgeSec = 0;
+    g_ExternalFileStamp = -1;
+
     string path = IO::FromStorageFolder("mp4-vehicle-detector/latest_detection.json");
-    if (!IO::FileExists(path)) {
-        g_ExternalDetectedLabel = "";
-        g_ExternalDetectedConfidence = 0.0f;
-        return;
-    }
+    if (!IO::FileExists(path)) return;
 
     Json::Value@ val = Json::FromFile(path);
-    if (val is null) {
-        g_ExternalDetectedLabel = "";
-        g_ExternalDetectedConfidence = 0.0f;
+    if (val is null) return;
+
+    // "timestamp" is POSIX seconds written by server.py (time.time()), so it
+    // compares directly against Time::Stamp — same epoch, both seconds.
+    // Time::Stamp is a PROPERTY (declared `int64 get_Stamp()` in the reflection
+    // DB), so it takes no parentheses; Time::Parse() would be wrong twice over
+    // because it returns an Info struct, not a number.
+    Json::Value@ tsField = val.Get("timestamp");
+    if (tsField !is null && tsField.GetType() == Json::Type::Number) {
+        int64 fileStamp = int64(tsField);
+        g_ExternalFileStamp = fileStamp;
+        int64 nowStamp = int64(Time::Stamp);
+        g_ExternalDetectedAgeSec = nowStamp - fileStamp;
+        if (g_ExternalDetectedAgeSec < 0) g_ExternalDetectedAgeSec = 0;
+        if (g_ExternalDetectedAgeSec > int64(DETECTION_STALE_SECONDS)) return;
+        g_ExternalDetectionStale = false;
+    } else {
+        // No usable timestamp — treat as untrusted rather than guessing.
         return;
     }
 
-    if (val.Get("label") !is null) {
-        g_ExternalDetectedLabel = string(val.Get("label"));
-    }
-    if (val.Get("confidence") !is null) {
-        g_ExternalDetectedConfidence = Text::ParseFloat(string(val.Get("confidence")));
+    g_ExternalDetectedLabel = ReadJsonString(val, "label");
+    g_ExternalDetectedConfidence = ReadJsonFloat(val, "confidence", 0.0f);
+    if (g_ExternalDetectedLabel.Length == 0) {
+        g_ExternalDetectionStale = true;
+        g_ExternalDetectedConfidence = 0.0f;
     }
 }
 
@@ -104,6 +166,7 @@ void RenderHudOverlay() {
         if (Time::Now - g_LastDetectionCheckMs > 1000) {
             g_LastDetectionCheckMs = Time::Now;
             UpdateLatestExternalDetection();
+            ScoreModelPrediction();
         }
 
         // Training control buttons
@@ -119,38 +182,67 @@ void RenderHudOverlay() {
             if (UI::Button("Stop")) StopTrainingSession();
         }
 
-        // Status details
+        UI::Separator();
+
+        // --- Detected vehicle: the primary readout, always first ---
+        UI::Text("Driven vehicle:");
+        UI::Text(g_CurrentDisplayName);
+        UI::TextDisabled("Source: " + g_CurrentSource + (g_CurrentTrust.Length > 0 ? "  [" + g_CurrentTrust + "]" : ""));
+
+        if (g_MapVehicle.Length > 0 && g_CurrentVehicle != "Unknown" && g_MapVehicle != g_CurrentVehicle) {
+            UI::TextDisabled("Map expects " + ToPrettyVehicleName(g_MapVehicle) + ".");
+        }
+
+        UI::Separator();
+
+        // Training status
         UI::TextDisabled("State: " + (g_TrainingCaptureArmed ? (g_TrainingCapturePaused ? "Paused" : "Running") : "Stopped"));
-        UI::Text("Training: " + (g_TrainingCaptureActive ? "Active" : "Inactive"));
         UI::TextDisabled("Mode: " + (S_ContinuousTrainingCapture ? "Continuous" : "Impact triggered"));
         UI::TextDisabled("Motion: " + g_TrainingMotionLabel);
 
         if (g_TrainingCaptureActive) {
             float elapsedSec = float(Time::Now - g_TrainingCaptureStartMs) / 1000.0f;
-            UI::Text("Segment time: " + Text::Format("%.2f s", elapsedSec));
+            UI::TextDisabled("Segment: " + Text::Format("%.1f s", elapsedSec));
         } else {
             UI::TextDisabled("Waiting for data.");
         }
 
-        // Vehicle labels
+        // Vehicle label used for training samples
         if (g_SelectedTrainingVehicle.Length > 0) {
-            UI::TextDisabled("Label: " + ToPrettyVehicleName(g_SelectedTrainingVehicle));
+            UI::TextDisabled("Training label: " + ToPrettyVehicleName(g_SelectedTrainingVehicle) + " (manual)");
         } else if (g_TrainingLockedVehicle.Length > 0) {
-            UI::TextDisabled("Label: " + ToPrettyVehicleName(g_TrainingLockedVehicle) + " (locked)");
+            UI::TextDisabled("Training label: " + ToPrettyVehicleName(g_TrainingLockedVehicle) + " (locked)");
         } else {
-            UI::TextDisabled("Label: Auto (Detection)");
-        }
-
-        // Server-side model inference results
-        if (g_ExternalDetectedLabel.Length > 0) {
-            UI::Text("External detection: " + ToPrettyVehicleName(g_ExternalDetectedLabel) + " (" + Text::Format("%.0f", g_ExternalDetectedConfidence * 100.0f) + "%)");
-        } else {
-            UI::TextDisabled("External detection: unknown");
+            UI::TextDisabled("Training label: auto - follows detected car");
         }
 
         if (g_TrainingLockedVehicle.Length > 0 && g_CurrentVehicle != g_TrainingLockedVehicle) {
-            UI::TextDisabled("Vehicle changed in game; training label stays locked.");
+            UI::TextDisabled("Car changed in game; label stays locked.");
         }
+
+        // Server-side model inference results (secondary — never the primary readout)
+        if (g_ExternalDetectedLabel.Length > 0 && !g_ExternalDetectionStale) {
+            UI::TextDisabled("Model guess: " + ToPrettyVehicleName(g_ExternalDetectedLabel) + " (" + Text::Format("%.0f%%", g_ExternalDetectedConfidence * 100.0f) + ")");
+        } else if (g_ExternalDetectedAgeSec > int64(DETECTION_STALE_SECONDS)) {
+            UI::TextDisabled("Model: stale (" + FormatAge(g_ExternalDetectedAgeSec) + " old)");
+        } else {
+            UI::TextDisabled("Model: not running");
+        }
+
+        // Live accuracy measured against the game readout, not an offline report.
+        if (S_ScoreModelAccuracy) {
+            if (g_ModelAgreeing) {
+                UI::TextDisabled("Model check: AGREES (streak " + Text::Format("%d", g_ModelStreak) + ")");
+            } else if (g_ModelTotal > 0) {
+                UI::TextDisabled("Model check: disagrees (streak " + Text::Format("%d", g_ModelStreak) + ")");
+            }
+            UI::TextDisabled("Model health: " + GetModelHealthVerdict());
+            if (g_ModelLastVerdict.Length > 0) {
+                UI::TextWrapped(g_ModelLastVerdict);
+            }
+        }
+
+        UI::Separator();
 
         // Dropdown selection for active training vehicle
         UI::SetNextItemWidth(UI::GetContentRegionAvail().x);
@@ -168,8 +260,7 @@ void RenderHudOverlay() {
             UI::EndCombo();
         }
 
-        UI::SameLine();
-        if (UI::Button("Accept detection as Manual")) {
+        if (UI::Button("Accept model guess")) {
             AcceptExternalDetectionAsManual();
         }
     }
@@ -187,43 +278,53 @@ void RenderDetectionWindow() {
     if (!S_ShowDetectionWindow) return;
 
     const uint flags = UI::WindowFlags::NoSavedSettings;
-    UI::SetNextWindowSize(260, 160, UI::Cond::FirstUseEver);
+    UI::SetNextWindowSize(280, 300, UI::Cond::FirstUseEver);
 
     if (!UI::Begin(Icons::Car + " Detected Vehicle", S_ShowDetectionWindow, flags)) {
         UI::End();
         return;
     }
 
-    if (g_ExternalDetectedLabel.Length == 0) {
-        UI::TextDisabled("Detected: unknown");
+    // --- Primary readout: what the game reports, never the ML model ---
+    UI::Text("Driven vehicle:");
+    UI::Text(g_CurrentDisplayName);
+    UI::TextDisabled("Source: " + g_CurrentSource + (g_CurrentTrust.Length > 0 ? "  [" + g_CurrentTrust + "]" : ""));
+    if (g_CurrentRawValue.Length > 0) {
+        UI::TextWrapped("Raw: " + g_CurrentRawValue);
+    }
+
+    if (g_MapVehicle.Length > 0 && g_CurrentVehicle != "Unknown" && g_MapVehicle != g_CurrentVehicle) {
+        UI::TextWrapped("Map expects " + ToPrettyVehicleName(g_MapVehicle) + ".");
+    }
+
+    // --- Thumbnail of the detected car ---
+    UI::Texture@ tex = GetVehicleTexture(g_CurrentVehicle);
+    if (tex !is null) {
+        UI::Image(tex, vec2(240, 130));
     } else {
-        UI::Text("Detected:");
-        UI::SameLine();
-        UI::Text(" " + ToPrettyVehicleName(g_ExternalDetectedLabel));
-        UI::TextDisabled("Confidence: " + Text::Format("%.1f%%", g_ExternalDetectedConfidence * 100.0f));
+        UI::TextDisabled("No thumbnail available.");
+    }
 
-        UI::Separator();
-        UI::Text("Thumbnail:");
-        UI::Texture@ detectedTex = GetVehicleTexture(g_ExternalDetectedLabel);
-        if (detectedTex !is null) {
-            UI::Image(detectedTex, vec2(120, 60));
-        } else {
-            UI::TextDisabled("No thumbnail available.");
-        }
+    UI::Separator();
 
-        // Export toggle configurations
-        if (S_EnableTrainingExport) {
-            UI::Text("Export: Enabled");
-            if (UI::Button("Disable export")) S_EnableTrainingExport = false;
-        } else {
-            UI::Text("Export: Disabled");
-            if (UI::Button("Enable export")) S_EnableTrainingExport = true;
-        }
-
-        if (UI::Button("Accept detection as Manual")) {
+    // --- ML model, demoted to a secondary line with an explicit health note ---
+    int64 modelAge = g_ExternalDetectedAgeSec;
+    if (modelAge > int64(DETECTION_STALE_SECONDS)) {
+        UI::TextDisabled("Model: stale (" + FormatAge(modelAge) + " old) - ignored.");
+    } else if (g_ExternalDetectedLabel.Length == 0) {
+        UI::TextDisabled("Model: not running.");
+    } else {
+        UI::TextDisabled("Model guess: " + ToPrettyVehicleName(g_ExternalDetectedLabel)
+            + " (" + Text::Format("%.0f%%", g_ExternalDetectedConfidence * 100.0f) + ")");
+        UI::TextDisabled("Model accuracy is low - the game readout above is authoritative.");
+        if (UI::Button("Accept model guess as label")) {
             AcceptExternalDetectionAsManual();
         }
-        UI::TextWrapped("Tip: enable export and use Manual selection while driving to collect more trusted samples.");
+    }
+
+    UI::Separator();
+    if (UI::Button(S_EnableTrainingExport ? "Disable sample export" : "Enable sample export")) {
+        S_EnableTrainingExport = !S_EnableTrainingExport;
     }
 
     UI::End();
@@ -259,9 +360,14 @@ void Render() {
     UI::Separator();
     UI::Text(g_CurrentDisplayName);
     UI::TextDisabled("Code: " + g_CurrentVehicle);
-    UI::TextDisabled("Source: " + g_CurrentSource);
+    UI::TextDisabled("Source: " + g_CurrentSource + (g_CurrentTrust.Length > 0 ? " (" + g_CurrentTrust + ")" : ""));
     if (g_CurrentRawValue.Length > 0) {
         UI::TextWrapped("Raw: " + g_CurrentRawValue);
+    }
+
+    // Warning when the map expects a different vehicle than the one detected.
+    if (g_MapVehicle.Length > 0 && g_CurrentVehicle != "Unknown" && g_MapVehicle != g_CurrentVehicle) {
+        UI::TextWrapped("Map expects " + ToPrettyVehicleName(g_MapVehicle) + " but you drive " + g_CurrentDisplayName + ".");
     }
 
     // Graphic render thumbnail
@@ -313,9 +419,8 @@ void Render() {
     // Session controls and ports
     UI::Separator();
     UI::Text("Training / Telemetry exports:");
-    UI::TextDisabled("Collecting trusted labels only: Manual selection");
-    UI::TextDisabled("Model inference: warm-start=6, conf>=60%, smoothing=2/3 (server)");
-    UI::TextDisabled("Latest external detection: Plugins/vehicle-detector-dev/tools/results/latest_detection.json");
+    UI::TextDisabled("Trusted labels come from the game readout or Manual selection");
+    UI::TextDisabled("The ML model is a guess only - low accuracy, shown as 'Model guess'");
     UI::TextDisabled("Training mode: " + (S_ContinuousTrainingCapture ? "Continuous segments" : "Impact-triggered captures"));
     UI::TextDisabled("Samples streamed to 127.0.0.1:" + S_TrainingExportPort);
     UI::TextDisabled("Hotkeys: Win+M, Menu or Ctrl+M pause/resume, M stop");

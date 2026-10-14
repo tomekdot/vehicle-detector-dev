@@ -32,6 +32,12 @@ bool S_ShowTelemetryPanel = true;
 [Setting category="Debug" name="Log Detection Details"]
 bool S_LogDetectionDetails = false;
 
+[Setting category="Debug" name="Score Model Accuracy"]
+bool S_ScoreModelAccuracy = true;
+
+[Setting category="Debug" name="Min Samples for Verdict" min=5 max=200]
+uint S_MinSamplesForVerdict = 25;
+
 [Setting category="Telemetry" name="Enable 0-100 Timing"]
 bool S_EnableZeroToHundredTiming = true;
 
@@ -80,7 +86,14 @@ bool S_SurfaceRaw = false;
 const string TRAINING_SCHEMA_NAME = "mp4_vehicle_detector_sample";
 const string TRAINING_FEATURE_COLUMNS = "speed_kmh,gear,rpm,gas,steer,side_speed,brake,ground,wheels_contact,avg_slip,wet_wheels,active_effects,is_loading";
 const uint TRAINING_SCHEMA_VERSION = 1;
-const uint TRAINING_SUPPORTED_VEHICLE_COUNT = 11;
+
+/**
+ * Number of vehicles offered in the training dropdown.
+ * Keep in sync with GetTrainingVehicleKeyByIndex() — that function is the
+ * single source of truth for the order, and this is only its length.
+ * See the SKILL note: never hardcode a count that can drift from the list.
+ */
+const uint TRAINING_SUPPORTED_VEHICLE_COUNT = 13;
 const uint TRAINING_SAMPLE_INTERVAL_MS = 100;
 const uint TRAINING_SOCKET_RETRY_MS = 2000;
 const uint TRAINING_CONTINUOUS_SEGMENT_MS = 8000;
@@ -94,3 +107,11 @@ const float TRAINING_RESUME_GAS = 0.35f;
 const float TRAINING_STEER_THRESHOLD = 0.35f;
 const float TRAINING_GAS_THRESHOLD = 0.35f;
 const string DATASET_STORAGE_FOLDER = "mp4-vehicle-detector";
+
+/**
+ * A model result older than this is treated as DEAD, not displayed.
+ * server.py rewrites latest_detection.json whenever it classifies a sample,
+ * so a fresh file is seconds old. A stale file is a stopped server (or an old
+ * run) and must never be shown as the car the player is currently driving.
+ */
+const uint DETECTION_STALE_SECONDS = 10;

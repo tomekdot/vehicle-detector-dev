@@ -121,18 +121,25 @@ void ClearTrainingVehicleLock() {
     g_TrainingLockedSource = "";
 }
 
-/** Locks the current vehicle as the active training label until manually changed. */
+/**
+ * Locks the current vehicle as the active training label until manually changed.
+ * Called at the start of a capture so a car swap mid-run cannot relabel samples
+ * that were already recorded under a different car.
+ *
+ * The lock now records EVERY car the readout identifies, including manual
+ * selections, because the label needs to stay stable for the whole segment.
+ */
 void LockTrainingVehicleForCurrentRun() {
-    if (g_SelectedTrainingVehicle.Length > 0) {
+    string label = GetTrainingVehicleForRun();
+    if (label.Length == 0 || label == "Unknown") {
         ClearTrainingVehicleLock();
         return;
     }
 
-    if (g_CurrentVehicle.Length == 0 || g_CurrentVehicle == "Unknown") return;
-    if (g_TrainingLockedVehicle == g_CurrentVehicle) return;
+    if (g_TrainingLockedVehicle == label) return;
 
-    g_TrainingLockedVehicle = g_CurrentVehicle;
-    g_TrainingLockedSource = g_CurrentSource;
+    g_TrainingLockedVehicle = label;
+    g_TrainingLockedSource = GetTrainingVehicleSourceForRun();
     AddTelemetryLine("Training vehicle locked: " + ToPrettyVehicleName(g_TrainingLockedVehicle));
 }
 
@@ -249,7 +256,19 @@ string GetDatasetSplitForRun() {
     return (g_TrainingRunId % S_ValidationEveryNRuns == 0) ? "validation" : "train";
 }
 
-/** Returns the vehicle used as the active training label for the current run. */
+/**
+ * Returns the vehicle used as the active training label for the current run.
+ *
+ * Priority:
+ *   1. Manual selection, when the player explicitly picked one.
+ *   2. The label locked at run start (see LockTrainingVehicleForCurrentRun) so
+ *      a mid-run car change cannot mislabel the samples already captured.
+ *   3. The live game readout (ForceModelId / Pursuit label / title ident).
+ *
+ * Step 3 is the point of this design: driving around with nothing selected
+ * still produces correctly-labelled samples, so collecting data for an
+ * under-represented car needs no clicking at all.
+ */
 string GetTrainingVehicleForRun() {
     if (g_SelectedTrainingVehicle.Length > 0) {
         return g_SelectedTrainingVehicle;
@@ -262,7 +281,12 @@ string GetTrainingVehicleForRun() {
     return g_CurrentVehicle;
 }
 
-/** Returns the source string associated with the active training label. */
+/**
+ * Returns the source string associated with the active training label.
+ * Only a manual selection is called "Manual selection" — an automatic label
+ * keeps the name of the detection source that produced it, so the dataset can
+ * be audited afterwards.
+ */
 string GetTrainingVehicleSourceForRun() {
     if (g_SelectedTrainingVehicle.Length > 0) {
         return "Manual selection";
@@ -275,7 +299,27 @@ string GetTrainingVehicleSourceForRun() {
     return g_CurrentSource;
 }
 
-/** Maps numbered shortcuts to the supported vehicle keys. */
+/**
+ * True when the active label came from the game rather than from a guess or a
+ * click. Used to decide whether a sample is trustworthy enough to keep, and
+ * shown in the UI so the player knows whether data is being collected for them.
+ */
+bool IsTrainingLabelTrusted() {
+    string label = GetTrainingVehicleForRun();
+    if (label.Length == 0 || label == "Unknown") return false;
+    return IsGameReadoutAuthoritative();
+}
+
+/**
+ * Maps numbered shortcuts to the supported vehicle keys.
+ * This function is the single source of truth for the dropdown order; the loop
+ * bound TRAINING_SUPPORTED_VEHICLE_COUNT must match the highest case below.
+ *
+ * Covers all 13 ManiaPlanet 4 vehicle identifiers. SpeedCar/AlpineCar are kept
+ * as separate entries because they are distinct registry ids, even though
+ * NormalizeToKnownVehicle() collapses them onto DesertCar/SnowCar for the
+ * detection path.
+ */
 string GetTrainingVehicleKeyByIndex(uint index) {
     switch (index) {
         case 1: return "StadiumCar";
@@ -286,9 +330,11 @@ string GetTrainingVehicleKeyByIndex(uint index) {
         case 6: return "BayCar";
         case 7: return "CoastCar";
         case 8: return "DesertCar";
-        case 9: return "SnowCar";
-        case 10: return "RallyCar";
-        case 11: return "TrafficCar";
+        case 9: return "SpeedCar";
+        case 10: return "SnowCar";
+        case 11: return "AlpineCar";
+        case 12: return "RallyCar";
+        case 13: return "TrafficCar";
     }
 
     return "";

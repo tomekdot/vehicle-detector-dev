@@ -1,9 +1,14 @@
 // ============================================================================
 // MP4 Vehicle Detector
 // ============================================================================
-// Detects the current MP4 vehicle from multiple sources (AsyncModelName,
-// Manialink labels, RootMap.CollectionName, ForceModelId) and provides
-// 0-100 km/h acceleration timing with telemetry-based vehicle guessing.
+// Detects which vehicle the player ACTUALLY drives on MP4, from the sources
+// the game really exposes (Pursuit Manialink label, ForceModelId,
+// SettingsPlayerModelId, titlepack VehicleIdentId), and provides 0-100 km/h
+// acceleration timing with telemetry-based vehicle guessing.
+//
+// The map's own VehicleName is deliberately NOT used to identify the car —
+// only as the weakest, explicitly-labelled expectation. Deriving the vehicle
+// from the map/collection name produced confidently wrong answers.
 // ============================================================================
 
 // File map:

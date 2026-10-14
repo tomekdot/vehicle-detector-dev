@@ -272,11 +272,16 @@ def main() -> int:
                             "run_id": current_run_id,
                         }
                         (results_dir / "latest_detection.json").write_text(json.dumps(latest), encoding="utf-8")
-                        # Also write to shared PluginStorage so the in-game plugin can read it
+                        # Also write to shared PluginStorage so the in-game plugin can read it.
+                        # IO::FromStorageFolder() resolves against the RUNNING plugin's folder name,
+                        # so this must include "vehicle-detector-dev" (the plugin these tools ship
+                        # with) -- writing only "vehicle-detector" left the plugin blind to the model.
                         try:
-                            storage_path = base_dir.parent.parent.parent / "PluginStorage" / "vehicle-detector" / "mp4-vehicle-detector"
-                            storage_path.mkdir(parents=True, exist_ok=True)
-                            (storage_path / "latest_detection.json").write_text(json.dumps(latest), encoding="utf-8")
+                            storage_root = base_dir.parent.parent.parent / "PluginStorage"
+                            for plugin_folder in ("vehicle-detector-dev", "vehicle-detector"):
+                                storage_path = storage_root / plugin_folder / "mp4-vehicle-detector"
+                                storage_path.mkdir(parents=True, exist_ok=True)
+                                (storage_path / "latest_detection.json").write_text(json.dumps(latest), encoding="utf-8")
                         except Exception:
                             pass
                     except Exception:

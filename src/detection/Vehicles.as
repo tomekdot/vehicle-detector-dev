@@ -44,7 +44,10 @@ string CleanupVehicleText(const string &in rawText) {
  * Normalizes a cleaned vehicle string against the known vehicle list.
  * Removes spaces, underscores, and hyphens before matching so that
  * variants like "Stadium Car", "stadium_car", "Stadium-Car" all match.
- * Returns the canonical key (e.g. "StadiumCar") or "" if no match.
+ *
+ * DesertCar/SpeedCar and SnowCar/AlpineCar are the SAME physical car on MP4
+ * (the terrain-pack vehicles), so both spellings collapse onto one canonical
+ * key. Returns the canonical key (e.g. "StadiumCar") or "" if no match.
  */
 string NormalizeToKnownVehicle(const string &in rawText) {
     string key = rawText.ToLower();
@@ -60,8 +63,8 @@ string NormalizeToKnownVehicle(const string &in rawText) {
     if (key.Contains("islandcar") || key == "island") return "IslandCar";
     if (key.Contains("baycar") || key == "bay") return "BayCar";
     if (key.Contains("coastcar") || key == "coast") return "CoastCar";
-    if (key.Contains("desertcar") || key == "desert" || key.Contains("cardesert")) return "DesertCar";
-    if (key.Contains("snowcar") || key == "snow" || key.Contains("carsnow")) return "SnowCar";
+    if (key.Contains("desertcar") || key.Contains("speedcar") || key == "desert" || key == "speed" || key.Contains("cardesert")) return "DesertCar";
+    if (key.Contains("snowcar") || key.Contains("alpinecar") || key == "snow" || key == "alpine" || key.Contains("carsnow")) return "SnowCar";
     if (key.Contains("rallycar") || key == "rally" || key.Contains("carrally")) return "RallyCar";
     if (key.Contains("trafficcar") || key == "traffic") return "TrafficCar";
 

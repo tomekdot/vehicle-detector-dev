@@ -136,9 +136,10 @@ void ResetAccelerationRun() {
 
 
 /**
- * If the primary detection failed or is unreliable (Unknown, raw-only,
- * or RootMap fallback), overwrites the result with the telemetry guess.
- * This gives a second chance to identify the vehicle from acceleration.
+ * If the primary detection failed or is unreliable, overwrites the result with
+ * the telemetry guess. The 0-100 acceleration guess is a real measurement, but
+ * it is weaker than anything the game reports directly — so it only overrides
+ * when the chain produced nothing trustworthy, never over a real forced model.
  */
 void ApplyTelemetryFallback(const string &in vehicle, const string &in displayName, const string &in source, const string &in rawValue,
     string &out outVehicle, string &out outDisplayName, string &out outSource, string &out outRawValue, bool &out didOverride) {
@@ -150,13 +151,11 @@ void ApplyTelemetryFallback(const string &in vehicle, const string &in displayNa
 
     if (g_TelemetryGuessVehicle == "Unknown" || g_TelemetryGuessVehicle.Length == 0) return;
 
-    // Only override when primary detection is weak
+    // Only override when nothing better exists.
     bool shouldOverride = false;
     if (vehicle == "Unknown") {
         shouldOverride = true;
-    } else if (source == "RootMap.CollectionName") {
-        shouldOverride = true;
-    } else if (source.EndsWith("(raw)")) {
+    } else if (source == "Map expectation") {
         shouldOverride = true;
     }
 
